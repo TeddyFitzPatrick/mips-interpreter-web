@@ -1,0 +1,1 @@
+A web interpreter for the MIPS 32-bit assembly language made with TypeScript and React.

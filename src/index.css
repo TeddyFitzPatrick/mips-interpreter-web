@@ -1,0 +1,11 @@
+@import "tailwindcss";
+
+
+/* codemirror editor */
+.cm-editor{
+    @apply bg-white w-full h-full text-lg
+}
+
+.cm-editor.cm-s-dark {
+    @apply bg-black
+}
