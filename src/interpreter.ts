@@ -1,8 +1,7 @@
-import {type Instruction, type Operand} from "./instructions.ts";
-import {InstructionFunctions, InstructionOperands} from "./instructions.ts";
+import { numberFormat } from "./main.tsx";
+import {type Instruction, type Operand, InstructionFunctions, InstructionOperands} from "./instructions.ts";
 
 const MAX_REG_VALUE = Math.pow(2, 32) - 1;
-const BIN = 2, OCTAL = 8, DEC = 10, HEX = 16;
 
 // Registers
 export const registers: Uint32Array = new Uint32Array(32);
@@ -40,15 +39,14 @@ export const registerLabels: string[] = [
   "$fp",   // 30
   "$ra",   // 31
 ];
-export const getRegisterOutput = (register: number, format?: number): string => {
-  if (format === undefined) format = HEX;
-  return registers[register].toString(format).padStart(8, "0");
-};
 // Non-accessible registers
 export let $pc = 0, $hi = 0, $lo = 0;
 
 // Symbol table
 const symtab: Map<string, number> = new Map<string, number>();
+
+// Program instructions
+let programInstructions: Instruction[] = [];
 
 // Execute the program 
 export const runProgram = (programText: string): void => {
@@ -63,6 +61,8 @@ export const runProgram = (programText: string): void => {
     const instructionFunction = InstructionFunctions.get(programInstruction.name)!;
     // run the function with operands
     instructionFunction(programInstruction);
+    // $zero can not change value
+    registers[0] = 0;
     // increment the program counter
     $pc += 1; // += 4 if this were a byte-addressable array  
   };
@@ -72,7 +72,11 @@ export const runProgram = (programText: string): void => {
 
   // update the UI registers
   updateRegisterDisplay();
-};
+}
+
+export const stepProgam = () => {
+
+}
 
 export const parse = (programText: string): Instruction[] => {
   console.log("\n\n")
@@ -89,7 +93,7 @@ export const parse = (programText: string): Instruction[] => {
   // Remove empty lines
   programLines = programLines.filter((programLine => programLine !== ""));
   // Convert each line into an instruction
-  let programInstructions: Instruction[] = [];
+  programInstructions = [];
   programLines.forEach((programLine, line) => {
     // separate the line into an instruction name and it's operands
     const instructionName = programLine.substring(0, programLine.indexOf(" ")).toLowerCase();
@@ -119,7 +123,7 @@ export const parse = (programText: string): Instruction[] => {
   });
   console.log(`Number of parsed instructions: ${programLines.length}`)
   return programInstructions;
-};
+}
 
 const parseRegisterOperand = (opText: string): number => {
   const register = registerLabels.indexOf(opText);
@@ -133,7 +137,19 @@ const parseNumericalOperand = (opText: string): number => {
   return numericalValue;
 }
 
-const updateRegisterDisplay = (): void => {
+export const resetProgram = (): void => {
+  registers.forEach((_value, index) => {
+    registers[index] = 0;
+    $pc = 0;
+  });
+  updateRegisterDisplay();
+}
+
+export const getRegisterOutput = (register: number): string => {
+  return registers[register].toString(numberFormat).toUpperCase();
+};
+
+export const updateRegisterDisplay = (): void => {
   for (let index = 0; index < 32; index++){
     const registerElement = document.getElementById(`reg${index}`);
     if (!registerElement) continue;

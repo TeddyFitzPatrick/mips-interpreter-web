@@ -2,9 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { EditorView, keymap, lineNumbers, gutter } from "@codemirror/view"
 import { defaultKeymap } from "@codemirror/commands"
-import { registers, getRegisterOutput, registerLabels, runProgram } from './interpreter.ts';
+import { registers, registerLabels, updateRegisterDisplay, runProgram, resetProgram} from './interpreter.ts';
 import './index.css'
 let textEditor: EditorView;
+
+export let numberFormat: number = 16;
 
 function Editor(){
   const editorRef = useRef<HTMLDivElement | null>(null);
@@ -19,31 +21,36 @@ function Editor(){
   return <div ref={editorRef} className="flex w-full h-1/2 bg-slate-400 rounded-xl p-6"></div>;
 }
 
+function Button({name, func}: {name: string, func: () => void}){
+  return <button onClick={func} className="border-4 shadow-2xl border-black px-8 py-4 text-2xl font-extrabold hover:scale-102 bg-cyan-500 rounded-xl">
+    {name}
+  </button>
+}
+
 function Buttons(){
-  const run = () => {
-    runProgram(textEditor.state.doc.toString());
-    return;
-  };
-  return <div className="w-full h-fit  py-4">
-    <button onClick={run} className="border-4 shadow-2xl border-black px-8 py-4 text-2xl font-extrabold hover:scale-102 bg-cyan-500 rounded-xl">
-      run
-    </button>
-    {/* <button className="border-2 border-black px-8 py-4 text-2xl font-extrabold hover:scale-102 bg-cyan-500 rounded-xl">...</button>
-    <button className="border-2 border-black px-8 py-4 text-2xl font-extrabold hover:scale-102 bg-cyan-500 rounded-xl">...</button> */}
+  return <div className="w-full h-fit py-4">
+    <Button name="run" func={() => {runProgram(textEditor.state.doc.toString())}}/>
+    <Button name="step" func={() => {return;}}/>
+    <Button name="reset" func={() => {resetProgram()}}/>
   </div>
 }
 
 function RegisterView(){
+  const changeNumberFormat = (event: React.ChangeEvent<HTMLSelectElement>): void => {
+    numberFormat = Number.parseInt(event.target.value);
+    updateRegisterDisplay();
+  };
   return (
     <div className="w-1/2 h-full flex bg-slate-900 p-4 rounded-xl shadow-xl flex-col">
       {/* register data format (default hex) */}
       <div className="bg-white shadow-xl rounded-xl my-4 w-full p-4 flex flex-col lg:flex-row">
         <h1 className="text-2xl font-extrabold h-full justify-center flex">Number System:</h1>
-        <select defaultValue="HEX" id="dataFormat" className="text-xl font-bold border-2 border-black rounded-xl shadow-xl ml-2 px-4 py-2">
-          <option value="BIN">Binary</option>
-          <option value="OCTAL">Octal</option>
-          <option value="DEC">Decimal</option>
-          <option value="HEX" >Hexadecimal</option>
+        <select defaultValue={16} onChange={changeNumberFormat}
+          className="text-xl font-bold border-2 border-black rounded-xl shadow-xl ml-2 px-4 py-2">
+          <option value={2}>Binary</option>
+          <option value={8}>Octal</option>
+          <option value={10}>Decimal</option>
+          <option value={16} >Hexadecimal</option>
         </select>
       </div>
 
@@ -54,8 +61,8 @@ function RegisterView(){
             {/* e.g. $t0  */}
             <h1 className="font-extrabold text-[100%]">{registerLabels[index]}:</h1>
             {/* e.g. 00000000 */}
-            <div id={"reg" + index.toString()}  className="bg-white text-[100%] rounded-xl py-1 px-2 shadow-xl font-extrabold">
-              {getRegisterOutput(index)}
+            <div id={"reg" + index.toString()}  className="bg-white text-[100%] rounded-xl py-1 px-2 shadow-xl font-extrabold truncate">
+              ...
             </div>
           </li>
         ))}
