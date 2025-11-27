@@ -2,7 +2,7 @@ import {type Instruction, type Operand} from "./instructions.ts";
 import {InstructionFunctions, InstructionOperands} from "./instructions.ts";
 
 const MAX_REG_VALUE = Math.pow(2, 32) - 1;
-export const BIN = 2, OCTAL = 8, DEC = 10, HEX = 16;
+const BIN = 2, OCTAL = 8, DEC = 10, HEX = 16;
 
 // Registers
 export const registers: Uint32Array = new Uint32Array(32);
@@ -40,11 +40,15 @@ export const registerLabels: string[] = [
   "$fp",   // 30
   "$ra",   // 31
 ];
-export const getRegisterOutput = (register: number, format: number): string => {
-    return registers[register].toString(format).padStart(8, "0");
+export const getRegisterOutput = (register: number, format?: number): string => {
+  if (format === undefined) format = HEX;
+  return registers[register].toString(format).padStart(8, "0");
 };
 // Non-accessible registers
-let $pc = 0, $hi = 0, $lo = 0;
+export let $pc = 0, $hi = 0, $lo = 0;
+
+// Symbol table
+const symtab: Map<string, number> = new Map<string, number>();
 
 // Execute the program 
 export const runProgram = (programText: string): void => {
@@ -65,9 +69,9 @@ export const runProgram = (programText: string): void => {
   // finish executing
   $pc = 0;
   console.log("finish execution");
-  Array.from(registers).forEach((register: number) => {
-    console.log(`Reg: ${register}`)
-  })
+
+  // update the UI registers
+  updateRegisterDisplay();
 };
 
 export const parse = (programText: string): Instruction[] => {
@@ -127,4 +131,12 @@ const parseNumericalOperand = (opText: string): number => {
   const numericalValue = Number.parseInt(opText);
   if (isNaN(numericalValue)) throw new Error(`Invalid numerical value ${opText}`);
   return numericalValue;
+}
+
+const updateRegisterDisplay = (): void => {
+  for (let index = 0; index < 32; index++){
+    const registerElement = document.getElementById(`reg${index}`);
+    if (!registerElement) continue;
+    registerElement.textContent = getRegisterOutput(index);
+  }
 }

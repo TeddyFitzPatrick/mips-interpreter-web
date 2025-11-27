@@ -1,4 +1,4 @@
-import { registers } from "./interpreter.ts";
+import { registers, $pc, $hi, $lo } from "./interpreter.ts";
 
 export type Instruction = {
   name: string,    // e.g. add, lw, sw
@@ -13,31 +13,31 @@ export type Instruction = {
 type InstructionFunction = (instr: Instruction) => void;
 
 export const InstructionFunctions: Map<string, InstructionFunction> = new Map<string, InstructionFunction>([
-    ["add", (instr: Instruction) => {
+    ["add", (instr: Instruction): void => {
         registers[instr.rd] = registers[instr.rs] + registers[instr.rt];
     }],
-    ["sub", (instr: Instruction) => {
+    ["sub", (instr: Instruction): void => {
         registers[instr.rd] = registers[instr.rs] - registers[instr.rt];
     }],    
-    ["and", (instr: Instruction) => {
+    ["and", (instr: Instruction): void => {
         registers[instr.rd] = registers[instr.rs] & registers[instr.rt];
     }],
-    ["or", (instr: Instruction) => {
+    ["or", (instr: Instruction): void => {
         registers[instr.rd] = registers[instr.rs] | registers[instr.rt];
     }],
-    ["xor", (instr: Instruction) => {
+    ["xor", (instr: Instruction): void => {
         registers[instr.rd] = registers[instr.rs] ^ registers[instr.rt];
     }],
-    ["nor", (instr: Instruction) => {
+    ["nor", (instr: Instruction): void => {
         registers[instr.rd] = ~(registers[instr.rs] | registers[instr.rt]);
     }],
-    ["slt", (instr: Instruction) => {
+    ["slt", (instr: Instruction): void => {
         registers[instr.rd] = (registers[instr.rs] < registers[instr.rt]) ? 1 : 0;
     }],
-    ["sll", (instr: Instruction) => {
+    ["sll", (instr: Instruction): void => {
         registers[instr.rd] = registers[instr.rt] << instr.shamt;
     }],
-    ["srl", (instr: Instruction) => {
+    ["srl", (instr: Instruction): void => {
         registers[instr.rd] = registers[instr.rt] >> instr.shamt;
     }],    
     // "sra"
@@ -50,24 +50,21 @@ export const InstructionFunctions: Map<string, InstructionFunction> = new Map<st
     // "mflo",
     // "jr",
     // "jalr",
-    ["addi", (instr: Instruction) => {
+    ["addi", (instr: Instruction): void => {
         registers[instr.rt] = registers[instr.rs] + instr.imm;
     }],
-    ["andi", (instr: Instruction) => {
+    ["andi", (instr: Instruction): void => {
         registers[instr.rt] = registers[instr.rs] & instr.imm;
     }], 
-    ["ori", (instr: Instruction) => {
+    ["ori", (instr: Instruction): void => {
         registers[instr.rt] = registers[instr.rs] | instr.imm;
     }],
-    ["xori", (instr: Instruction) => {
+    ["xori", (instr: Instruction): void => {
         registers[instr.rt] = registers[instr.rs] ^ instr.imm;
     }],
-    ["slti", (instr: Instruction) => {
+    ["slti", (instr: Instruction): void => {
         registers[instr.rt] = (registers[instr.rs] < instr.imm) ? 1 : 0;
     }],
-    ["li", (instr: Instruction): void => {
-        registers[instr.rs] = instr.imm;
-    }]    
     // "lui",
     // "lb",
     // "lh",
@@ -78,7 +75,15 @@ export const InstructionFunctions: Map<string, InstructionFunction> = new Map<st
     // "beq",
     // "bne",
     // "j",
-    // "jal"
+    // "jal",
+
+    // Pseudos
+    ["li", (instr: Instruction): void => {
+        registers[instr.rs] = instr.imm;
+    }],
+    ["move", (instr: Instruction): void => {
+        registers[instr.rd] = registers[instr.rs];
+    }]
 ]);
 
 export type Operand = keyof Omit<Instruction, "name">;
@@ -101,7 +106,6 @@ export const InstructionOperands: Map<string, Operand[]> = new Map([
     ["div", ["rs", "rt"]],
     ["mfhi", ["rd"]],
     ["mflo", ["rd"]],
-    ["li", ["rs", "imm"]],
     ["jr", ["rs"]],
     ["jalr", ["rd", "rs"]],
     ["addi", ["rt", "rs", "imm"]],
@@ -119,5 +123,8 @@ export const InstructionOperands: Map<string, Operand[]> = new Map([
     ["beq", ["rs", "rt", "imm"]],
     ["bne", ["rs", "rt", "imm"]],
     ["j", ["address"]],
-    ["jal", ["address"]]
+    ["jal", ["address"]],
+    // pseudos
+    ["li", ["rs", "imm"]],
+    ["move", ["rd", "rs"]]
 ]);

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { EditorView, keymap, lineNumbers, gutter } from "@codemirror/view"
 import { defaultKeymap } from "@codemirror/commands"
-import { registers, getRegisterOutput, registerLabels, runProgram, HEX } from './interpreter.ts';
+import { registers, getRegisterOutput, registerLabels, runProgram } from './interpreter.ts';
 import './index.css'
 let textEditor: EditorView;
 
@@ -36,7 +36,7 @@ function Buttons(){
 function RegisterView(){
   return (
     <div className="w-1/2 h-full flex bg-slate-900 p-4 rounded-xl shadow-xl flex-col">
-      {/* register data format */}
+      {/* register data format (default hex) */}
       <div className="bg-white shadow-xl rounded-xl my-4 w-full p-4 flex flex-col lg:flex-row">
         <h1 className="text-2xl font-extrabold h-full justify-center flex">Number System:</h1>
         <select defaultValue="HEX" id="dataFormat" className="text-xl font-bold border-2 border-black rounded-xl shadow-xl ml-2 px-4 py-2">
@@ -51,9 +51,11 @@ function RegisterView(){
       <ul className="w-full h-fit flex flex-col md:flex-row flex-wrap ">
         {Array.from(registers).map((_value, index) => (
           <li key={index} className="w-full md:w-1/2 h-fit bg-slate-400 rounded-xl p-2 border-4 border-black flex flex-row justify-around">
+            {/* e.g. $t0  */}
             <h1 className="font-extrabold text-[100%]">{registerLabels[index]}:</h1>
-            <div className="bg-white text-[100%] rounded-xl py-1 px-2 shadow-xl font-extrabold">
-              {getRegisterOutput(index, HEX)}
+            {/* e.g. 00000000 */}
+            <div id={"reg" + index.toString()}  className="bg-white text-[100%] rounded-xl py-1 px-2 shadow-xl font-extrabold">
+              {getRegisterOutput(index)}
             </div>
           </li>
         ))}
