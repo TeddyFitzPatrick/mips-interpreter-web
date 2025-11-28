@@ -178,7 +178,7 @@ export const parse = (programText: string): Instruction[] => {
       if (["rs", "rt", "rd"].includes(instructionOperand)){
         instruction[instructionOperand] = parseRegisterOperand(instructionArg);
       }
-      else if (Number.isFinite(+instructionArg)){
+      else if (isNumeric(instructionArg)){
         instruction[instructionOperand] = parseNumericalOperand(instructionArg);      
       }
       else if (instructionOperand === "address" || instructionOperand === "imm"){
@@ -196,7 +196,7 @@ export const parse = (programText: string): Instruction[] => {
 const parseRegisterOperand = (opText: string): number => {
   // Register takes the form of $0, $1, ..., $31
   if (isNumeric(opText.substring(1))){
-    return Number(opText.substring(1));
+    return +opText.substring(1);
   }
   const register = registerNames.indexOf(opText);
   if (register === -1) throw new Error(`Invalid register operand ${opText} `);
@@ -204,10 +204,8 @@ const parseRegisterOperand = (opText: string): number => {
 }
 
 const parseNumericalOperand = (opText: string): number => {
-  // immediate numerical value
-  const numericalValue = Number.parseInt(opText);
-  if (!Number.isFinite(numericalValue)) throw new Error(`Invalid numerical value ${opText}`);
-  return numericalValue;
+  if (!isNumeric(opText)) throw new Error(`Invalid numerical value ${opText}`);
+  return +opText;
 }
 
 export const changeProgramCounter = (newPC: number): void => {
