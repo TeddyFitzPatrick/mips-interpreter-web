@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { EditorView, keymap, lineNumbers, gutter } from "@codemirror/view"
 import { defaultKeymap } from "@codemirror/commands"
-import { registers, registerLabels, updateRegisterDisplay, runProgram, resetProgram} from './interpreter.ts';
+import { registers, registerNames, updateRegisterDisplay, runProgram, resetProgram} from './interpreter.ts';
 import './index.css'
 let textEditor: EditorView;
 
@@ -59,7 +59,7 @@ function RegisterView(){
         {Array.from(registers).map((_value, index) => (
           <li key={index} className="w-full md:w-1/2 h-fit bg-slate-400 rounded-xl p-2 border-4 border-black flex flex-row justify-around">
             {/* e.g. $t0  */}
-            <h1 className="font-extrabold text-[100%]">{registerLabels[index]}:</h1>
+            <h1 className="font-extrabold text-[100%]">{registerNames[index]}:</h1>
             {/* e.g. 00000000 */}
             <div id={"reg" + index.toString()}  className="bg-white text-[100%] rounded-xl py-1 px-2 shadow-xl font-extrabold truncate">
               ...

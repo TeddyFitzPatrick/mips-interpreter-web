@@ -5,7 +5,7 @@ const MAX_REG_VALUE = Math.pow(2, 32) - 1;
 
 // Registers
 export const registers: Uint32Array = new Uint32Array(32);
-export const registerLabels: string[] = [
+export const registerNames: string[] = [
   "$zero", // 0
   "$at",   // 1 (reserved)
   "$v0",   // 2
@@ -69,64 +69,46 @@ export const runProgram = (programText: string): void => {
   // finish executing
   $pc = 0;
   console.log("finish execution");
-
   // update the UI registers
   updateRegisterDisplay();
 }
 
-export const stepProgam = () => {
-
+export const stepProgam = (): void => {
+  // TODO
+  $pc += 1;
 }
 
 export const parse = (programText: string): Instruction[] => {
-  console.log("\n\n")
-  let programLines: string[] = programText.split("\n");
-  // Remove leading and trailing whitespace and normalize whitespace
-  programLines.forEach((_line, index) => {
-    programLines[index] = programLines[index].trim().replace(/\s+/g, " ");
-    // remove comments
-    const commentIndex = programLines[index].indexOf("#");
-    if (commentIndex !== -1){
-      programLines[index] = programLines[index].substring(0, commentIndex);
-    }
+  return programText
+    .split("\n")
+    .map(line => {
+      // Remove trailing & leading whitespace, normalize whitespace, remove comments
+      return line.split("#")[0].trim().replace(/\s+/g, " ");
+    })
+    .filter((programLine => programLine !== "")) // remove empty lines
+    .map(line => {
+      // Convert the list of text lines to a list of instruction types
+      const firstSpaceIndex = line.indexOf(" ");
+      const instructionName = line.substring(0, firstSpaceIndex).toLowerCase();
+      const instructionArgs = line.substring(firstSpaceIndex).replace(/\s+/g, "").split(",");
+      const instructionOperands: Operand[] = InstructionOperands.get(instructionName)!;
+      const instruction: Instruction = {
+        name: instructionName, rs: 0, rt: 0, rd: 0, shamt: 0, imm: 0, address: 0
+      };
+      for (let operandIndex = 0; operandIndex < instructionOperands.length; operandIndex++){
+        const instructionArg: string = instructionArgs[operandIndex];
+        const instructionOperand: Operand = instructionOperands[operandIndex];
+        // convert string arguments to operands (e.g. "$v0" -> 2, "555" -> 555)
+        instruction[instructionOperand] = ["rs", "rt", "rd"].includes(instructionOperand) 
+          ? parseRegisterOperand(instructionArg)
+          : parseNumericalOperand(instructionArg);
+      }
+    return instruction;
   });
-  // Remove empty lines
-  programLines = programLines.filter((programLine => programLine !== ""));
-  // Convert each line into an instruction
-  programInstructions = [];
-  programLines.forEach((programLine, line) => {
-    // separate the line into an instruction name and it's operands
-    const instructionName = programLine.substring(0, programLine.indexOf(" ")).toLowerCase();
-    const instructionArgs = programLine.substring(programLine.indexOf(" ")).replace(/\s+/g, "").split(",");
-    // get the corresponding operand fields for that instruction
-    const instructionOperands: Operand[] = InstructionOperands.get(instructionName)!;
-    // build the instruction given its format
-    const lineInstruction: Instruction = {
-      name: instructionName,
-      rs: 0,
-      rt: 0,
-      rd: 0,
-      shamt: 0,
-      imm: 0,
-      address: 0
-    }
-    // match each argument to its corresponding operand
-    let operandIndex = 0;
-    instructionArgs.forEach((instructionArg) => {
-      const instructionOperand: keyof Instruction = instructionOperands[operandIndex++];
-      // convert string arguments to operands (e.g. "$v0" -> 2, "555" -> 555)
-      lineInstruction[instructionOperand] = ["rs", "rt", "rd"].includes(instructionOperand) 
-        ? parseRegisterOperand(instructionArg)
-        : parseNumericalOperand(instructionArg);
-    });
-    programInstructions.push(lineInstruction);
-  });
-  console.log(`Number of parsed instructions: ${programLines.length}`)
-  return programInstructions;
 }
 
 const parseRegisterOperand = (opText: string): number => {
-  const register = registerLabels.indexOf(opText);
+  const register = registerNames.indexOf(opText);
   if (register === -1) throw new Error(`Invalid register operand ${opText} `)
   return register;
 }
@@ -147,7 +129,7 @@ export const resetProgram = (): void => {
 
 export const getRegisterOutput = (register: number): string => {
   return registers[register].toString(numberFormat).toUpperCase();
-};
+}
 
 export const updateRegisterDisplay = (): void => {
   for (let index = 0; index < 32; index++){

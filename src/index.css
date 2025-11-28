@@ -9,3 +9,7 @@
 .cm-editor.cm-s-dark {
     @apply bg-black
 }
+
+.cm-highlighted-line {
+    @apply bg-cyan-400
+}
