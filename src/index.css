@@ -1,9 +1,8 @@
 @import "tailwindcss";
 
-
 /* codemirror editor */
 .cm-editor{
-    @apply bg-white w-full h-full text-lg
+    @apply bg-color1 w-full h-full text-lg
 }
 
 .cm-editor.cm-s-dark {
@@ -12,4 +11,14 @@
 
 .cm-highlighted-line {
     @apply bg-cyan-400
+}
+
+/* color palette  */
+@theme {
+  --color-color1: #f0fcf7;
+  --color-color2: #d9eddf;
+  --color-color3: #27c196;
+  --color-color4: #619c86;
+  --color-contrast: #C14427;
+
 }

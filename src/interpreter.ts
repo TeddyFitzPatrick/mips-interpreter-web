@@ -52,6 +52,7 @@ let programInstructions: Instruction[] = [];
 export const runProgram = (programText: string): void => {
   // parse the program text into a list of instructions
   const programInstructions: Instruction[] = parse(programText);
+  console.log("Instructions:",programInstructions);
   // no instructions to execute
   if (programInstructions.length === 0) return;
   // execute the program instructions
@@ -79,14 +80,18 @@ export const stepProgam = (): void => {
 }
 
 export const parse = (programText: string): Instruction[] => {
+  let lineNumber: number = 0;
   return programText
     .split("\n")
     .map(line => {
       // Remove trailing & leading whitespace, normalize whitespace, remove comments
-      return line.split("#")[0].trim().replace(/\s+/g, " ");
+      const cleanLine = line.split("#")[0].trim().replace(/\s+/g, " ")
+      // Add labels to the symble tab
+      return cleanLine
     })
-    .filter((programLine => programLine !== "")) // remove empty lines
+    .filter(line => line !== "") // remove empty lines
     .map(line => {
+      console.log("line:",line);
       // Convert the list of text lines to a list of instruction types
       const firstSpaceIndex = line.indexOf(" ");
       const instructionName = line.substring(0, firstSpaceIndex).toLowerCase();
@@ -103,17 +108,26 @@ export const parse = (programText: string): Instruction[] => {
           ? parseRegisterOperand(instructionArg)
           : parseNumericalOperand(instructionArg);
       }
+      // Increment the line number
+      lineNumber++;
     return instruction;
   });
 }
 
 const parseRegisterOperand = (opText: string): number => {
   const register = registerNames.indexOf(opText);
-  if (register === -1) throw new Error(`Invalid register operand ${opText} `)
+  if (register === -1) throw new Error(`Invalid register operand ${opText} `);
   return register;
 }
 
 const parseNumericalOperand = (opText: string): number => {
+  // label address value
+  if (!Number.isFinite(+opText)){
+    const labelAddress = symtab.get(opText);
+    if (labelAddress === undefined) throw new Error(`Invalid label ${opText} `);
+    return labelAddress;
+  }
+  // immediate numerical value
   const numericalValue = Number.parseInt(opText);
   if (isNaN(numericalValue)) throw new Error(`Invalid numerical value ${opText}`);
   return numericalValue;
