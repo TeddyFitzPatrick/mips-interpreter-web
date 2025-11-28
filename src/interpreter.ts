@@ -50,36 +50,53 @@ let programInstructions: Instruction[] = [];
 
 // Execute the program 
 export const runProgram = (programText: string): void => {
-  // parse the program text into a list of instructions
-  programInstructions = parse(programText);
-  console.log("Instructions:",programInstructions);
-  console.log("Symtab:",symtab);
-  // no instructions to execute
-  if (programInstructions.length === 0) return;
-  // execute the program instructions
-  let counter = 0;
-  while ($pc < programInstructions.length){
-    const programInstruction = programInstructions[$pc];
-    // retrieve the function's execution function (e.g. add => {rd = rs + rt})
-    let originalPC = $pc;
-    const instructionFunction = InstructionFunctions.get(programInstruction.name);
-    if (instructionFunction === undefined) throw new Error(`Illegal Function: ${programInstruction.name}`);
-    // run the function with operands
-    instructionFunction(programInstruction);
-    // $zero can not change value
-    registers[0] = 0;
-    // increment the program counter if the instruction didn't change it
-    if (originalPC === $pc){
-      $pc += 1; // += 4 if this were a byte-addressable array  
+  const errorOutput: HTMLElement | null = document.getElementById("errorOutput");
+  if (errorOutput === null) return;
+  try{
+    // parse the program text into a list of instructions
+    programInstructions = parse(programText);
+    console.log("Instructions:",programInstructions);
+    console.log("Symtab:",symtab);
+    // no instructions to execute
+    if (programInstructions.length === 0) return;
+    // execute the program instructions
+    let counter = 0;
+    while ($pc < programInstructions.length){
+      const programInstruction = programInstructions[$pc];
+      // retrieve the function's execution function (e.g. add => {rd = rs + rt})
+      let originalPC = $pc;
+      const instructionFunction = InstructionFunctions.get(programInstruction.name);
+      if (instructionFunction === undefined) throw new Error(`Illegal Function: ${programInstruction.name}`);
+      // run the function with operands
+      instructionFunction(programInstruction);
+      // $zero can not change value
+      registers[0] = 0;
+      // increment the program counter if the instruction didn't change it
+      if (originalPC === $pc){
+        $pc += 1; // += 4 if this were a byte-addressable array  
+      }
+      counter++;
+      if (counter > 100) break;
+    };
+    // finish executing
+    $pc = 0;
+    console.log("finish execution");
+    // update the UI registers
+    updateRegisterDisplay();
+    // Clear error output on successful execution
+    errorOutput.textContent = "";
+  } catch (error: unknown){
+    // Parsing or program execution failure
+    resetProgram();
+    if (error instanceof Error){
+      errorOutput.textContent = error.message;
+    } else if (typeof error === "string"){
+      errorOutput.textContent = error;
+    } else {
+      console.log("Error: ", error);
+      console.log("Unknown error type", typeof error);
     }
-    counter++;
-    if (counter > 100) break;
-  };
-  // finish executing
-  $pc = 0;
-  console.log("finish execution");
-  // update the UI registers
-  updateRegisterDisplay();
+  }
 }
 
 // export const stepProgam = (programText: string): void => {
@@ -88,14 +105,22 @@ export const runProgram = (programText: string): void => {
 // }
 
 export const resetProgram = (): void => {
+  // reset error output
+  const errorOutput: HTMLElement | null = document.getElementById("errorOutput");
+  if (errorOutput === null) return;
+  errorOutput.textContent = "";
+  // reset registers to 0
   registers.forEach((_value, index) => {
     registers[index] = 0;
     $pc = 0;
   });
+  // update the register display
   updateRegisterDisplay();
 }
 
 export const parse = (programText: string): Instruction[] => {
+
+  console.log("TEXT: {", programText + "}");
   let lineNumber: number = 0;
   const programLines = programText
     .split("\n")
@@ -109,11 +134,19 @@ export const parse = (programText: string): Instruction[] => {
     .map(line => {
       let colonIndex = line.indexOf(":");
       while (colonIndex !== -1){
-        if (colonIndex === 0) throw new Error(`Syntax Error, Illegal Label`);
-        let label = line.substring(0, colonIndex).trim();
+        // No empty string labels
+        if (colonIndex === 0) throw new Error(`Empty label`);
+        let label = line.substring(0, colonIndex).replace(/^\s+/, "");
         line = line.substring(colonIndex + 1).trim();
-        // Label names can not have whitespace in them
+        // Label validation
+        // No spaces in the label name
         if (/\s/.test(label)) throw new Error (`Invalid label ${label}`);
+        // Only letters or _ for the first character
+        if (!/^[A-Za-z_]$/.test(label[0])) throw new Error (`Illegal first character for label ${label}`);
+        // All subsequent characters in the label must be alphanumeric or _
+        for (let index = 1; index < label.length; index++){
+          if (!/^[A-Za-z0-9_]$/.test(label[index])) throw new Error (`Illegal label ${label}, special characters not allowed`);
+        }
         // Add the label to the symtab
         symtab.set(label, lineNumber);
         colonIndex = line.indexOf(":");
@@ -126,20 +159,33 @@ export const parse = (programText: string): Instruction[] => {
   if (programLines.length === 0) return [];
   // Convert each line into an instruction
   return programLines.map(line => {
+    // Separate each line into an instruction name and its arguments ("addi" + "$t0, $t0, 1")
     const firstSpaceIndex = line.indexOf(" ");
-    const instructionName = line.substring(0, firstSpaceIndex).toLowerCase();
-    const instructionArgs = line.substring(firstSpaceIndex).replace(/\s+/g, "").split(",");
-    const instructionOperands: Operand[] = InstructionOperands.get(instructionName)!;
+    if (firstSpaceIndex === -1) throw new Error(`Invalid line "${line}", missing a space`)
+    const instructionName = line.slice(0, firstSpaceIndex).toLowerCase();
+    const instructionArgs = line.slice(firstSpaceIndex).replace(/\s+/g, "").split(",");
+    // Get the instruction's operands (e.g. addi => ["rs", "rt", "imm"])
+    const instructionOperands = InstructionOperands.get(instructionName);
+    if (instructionOperands === undefined) throw new Error(`Instruction operands for ${instructionName} could not be determined.`);
+    // Generate the line's corresponding instruction
     const instruction: Instruction = {
       name: instructionName, rs: 0, rt: 0, rd: 0, shamt: 0, imm: 0, address: 0
-    };
+    }
     for (let operandIndex = 0; operandIndex < instructionOperands.length; operandIndex++){
       const instructionArg: string = instructionArgs[operandIndex];
       const instructionOperand: Operand = instructionOperands[operandIndex];
-      // convert string arguments to operands (e.g. "$v0" -> 2, "555" -> 555)
-      instruction[instructionOperand] = ["rs", "rt", "rd"].includes(instructionOperand) 
-        ? parseRegisterOperand(instructionArg)
-        : parseNumericalOperand(instructionArg);
+      // convert string argument representation to operands (e.g. "$v0" -> 2, "555" -> 555, "loop:" -> 24)
+      if (["rs", "rt", "rd"].includes(instructionOperand)){
+        instruction[instructionOperand] = parseRegisterOperand(instructionArg);
+      }
+      else if (Number.isFinite(+instructionArg)){
+        instruction[instructionOperand] = parseNumericalOperand(instructionArg);      
+      }
+      else if (instructionOperand === "address" || instructionOperand === "imm"){
+        instruction[instructionOperand] = instructionArg;
+      } else{
+        throw new Error(`Invalid argument ${instructionArg} for instruction ${instructionName} operand ${instructionOperand}`);
+      }
     }
     // Increment the line number
     lineNumber++;
@@ -149,7 +195,7 @@ export const parse = (programText: string): Instruction[] => {
 
 const parseRegisterOperand = (opText: string): number => {
   // Register takes the form of $0, $1, ..., $31
-  if (Number.isFinite(+opText.substring(1))){
+  if (isNumeric(opText.substring(1))){
     return Number(opText.substring(1));
   }
   const register = registerNames.indexOf(opText);
@@ -158,15 +204,9 @@ const parseRegisterOperand = (opText: string): number => {
 }
 
 const parseNumericalOperand = (opText: string): number => {
-  // label address value
-  if (!Number.isFinite(+opText)){
-    const labelAddress = symtab.get(opText);
-    if (labelAddress === undefined) throw new Error(`Invalid label ${opText}`);
-    return labelAddress;
-  }
   // immediate numerical value
   const numericalValue = Number.parseInt(opText);
-  if (isNaN(numericalValue)) throw new Error(`Invalid numerical value ${opText}`);
+  if (!Number.isFinite(numericalValue)) throw new Error(`Invalid numerical value ${opText}`);
   return numericalValue;
 }
 
@@ -184,4 +224,8 @@ export const updateRegisterDisplay = (): void => {
     if (!registerElement) continue;
     registerElement.textContent = getRegisterOutput(index);
   }
+}
+
+const isNumeric = (numberRepresentation: string): boolean => {
+  return numberRepresentation.trim() !== "" && Number.isFinite(+numberRepresentation);
 }

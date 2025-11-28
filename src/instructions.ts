@@ -6,8 +6,10 @@ export type Instruction = {
   rt: number,      // source 2 register
   rd: number,      // destination register
   shamt: number,   // shift amount
-  imm: number,     // the imm/addr of an I-type
-  address: number  // the 26-bit J-type addr
+                   // the imm/addr of an I-type
+  imm: number | string,     
+                   // the 26-bit J-type addr
+  address: number | string 
 }
 
 type InstructionFunction = (instr: Instruction) => void;
@@ -60,19 +62,24 @@ export const InstructionFunctions: Map<string, InstructionFunction> = new Map<st
         registers[registerNames.indexOf("$ra")] = $pc + 1;
     }],
     ["addi", (instr: Instruction): void => {
-        registers[instr.rt] = registers[instr.rs] + instr.imm;
+        if (typeof instr.imm !== "number") throw new Error(`Invalid immediate ${instr.imm} for addi instruction`);
+        registers[instr.rt] = registers[instr.rs] + +instr.imm;
     }],
     ["andi", (instr: Instruction): void => {
-        registers[instr.rt] = registers[instr.rs] & instr.imm;
+        if (typeof instr.imm !== "number") throw new Error(`Invalid immediate ${instr.imm} for andi instruction`);
+        registers[instr.rt] = registers[instr.rs] & +instr.imm;
     }], 
     ["ori", (instr: Instruction): void => {
-        registers[instr.rt] = registers[instr.rs] | instr.imm;
+        if (typeof instr.imm !== "number") throw new Error(`Invalid immediate ${instr.imm} for ori instruction`);
+        registers[instr.rt] = registers[instr.rs] | +instr.imm;
     }],
     ["xori", (instr: Instruction): void => {
-        registers[instr.rt] = registers[instr.rs] ^ instr.imm;
+        if (typeof instr.imm !== "number") throw new Error(`Invalid immediate ${instr.imm} for xori instruction`);
+        registers[instr.rt] = registers[instr.rs] ^ +instr.imm;
     }],
     ["slti", (instr: Instruction): void => {
-        registers[instr.rt] = (registers[instr.rs] < instr.imm) ? 1 : 0;
+        if (typeof instr.imm !== "number") throw new Error(`Invalid immediate ${instr.imm} for slti instruction`);
+        registers[instr.rt] = (registers[instr.rs] < +instr.imm) ? 1 : 0;
     }],
     // "lui",
     // "lb",
@@ -82,26 +89,52 @@ export const InstructionFunctions: Map<string, InstructionFunction> = new Map<st
     // "sh",
     // "sw",
     ["beq", (instr: Instruction): void => {
+        // Check a label is passed instead of an absolute address number
+        if (typeof instr.imm === "number") throw new Error(`Invalid address ${instr.imm} for beq instruction`);
+        // Verify the label is in the symtab
+        const newPC = symtab.get(instr.imm);
+        if (newPC === undefined) throw new Error(`Invalid label ${instr.imm}`);
         if (registers[instr.rs] === registers[instr.rt]){
-            changeProgramCounter(instr.imm);
+            changeProgramCounter(newPC);
         }
     }],
     ["bne", (instr: Instruction): void => {
+        // Check a label is passed instead of an absolute address number
+        if (typeof instr.imm === "number") throw new Error(`Invalid address ${instr.imm} for bne instruction`);
+        // Verify the label is in the symtab
+        const newPC = symtab.get(instr.imm);
+        if (newPC === undefined) throw new Error(`Invalid label ${instr.imm}`);
         if (registers[instr.rs] !== registers[instr.rt]){
-            changeProgramCounter(instr.imm);
+            changeProgramCounter(newPC);
         }
     }],
     ["j", (instr: Instruction): void => {
-        changeProgramCounter(instr.address);
+        if (typeof instr.address === "number") throw new Error(`Invalid address ${instr.address} for j instruction`);
+        // Verify the label is in the symtab
+        const newPC = symtab.get(instr.address);
+        if (newPC === undefined) throw new Error(`Invalid label ${instr.imm}`);
+        changeProgramCounter(newPC);
     }],
     ["jal", (instr: Instruction): void => {
-        changeProgramCounter(instr.address);
+        if (typeof instr.address === "number") throw new Error(`Invalid address ${instr.address} for jal instruction`);
+        // Verify the label is in the symtab
+        const newPC = symtab.get(instr.address);
+        if (newPC === undefined) throw new Error(`Invalid label ${instr.imm}`);
+        changeProgramCounter(newPC);
         registers[registerNames.indexOf("$ra")] = $pc + 1;
     }],
 
     // Pseudos
     ["li", (instr: Instruction): void => {
+        if (typeof instr.imm === "string") throw new Error(`Illegal immediate value ${instr.imm} for li instruction`)
         registers[instr.rs] = instr.imm;
+    }],
+    ["la", (instr: Instruction): void => {
+        if (typeof instr.imm === "number") throw new Error(`Illegal immediate value ${instr.imm} for la instruction`)
+        // Verify the label is in the symtab
+        const address = symtab.get(instr.imm);
+        if (address === undefined) throw new Error(`Invalid label ${instr.imm}`);
+        registers[instr.rs] = address;
     }],
     ["move", (instr: Instruction): void => {
         registers[instr.rd] = registers[instr.rs];
@@ -148,5 +181,6 @@ export const InstructionOperands: Map<string, Operand[]> = new Map([
     ["jal", ["address"]],
     // pseudos
     ["li", ["rs", "imm"]],
+    ["la", ["rs", "imm"]],
     ["move", ["rd", "rs"]]
 ]);
