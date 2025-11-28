@@ -55,11 +55,11 @@ export const InstructionFunctions: Map<string, InstructionFunction> = new Map<st
         registers[instr.rd] = $lo;
     }],
     ["jr", (instr: Instruction): void => {
-        changeProgramCounter(instr.rs);
+        changeProgramCounter(registers[instr.rs]);
     }],
     ["jalr", (instr: Instruction): void => {
-        changeProgramCounter(instr.rs);
         registers[registerNames.indexOf("$ra")] = $pc + 1;
+        changeProgramCounter(registers[instr.rs]);
     }],
     ["addi", (instr: Instruction): void => {
         if (typeof instr.imm !== "number") throw new Error(`Invalid immediate ${instr.imm} for addi instruction`);
@@ -117,11 +117,12 @@ export const InstructionFunctions: Map<string, InstructionFunction> = new Map<st
     }],
     ["jal", (instr: Instruction): void => {
         if (typeof instr.address === "number") throw new Error(`Invalid address ${instr.address} for jal instruction`);
+        // Store the next instruction in the $ra
+        registers[registerNames.indexOf("$ra")] = $pc + 1;
         // Verify the label is in the symtab
         const newPC = symtab.get(instr.address);
         if (newPC === undefined) throw new Error(`Invalid label ${instr.imm}`);
         changeProgramCounter(newPC);
-        registers[registerNames.indexOf("$ra")] = $pc + 1;
     }],
 
     // Pseudos
@@ -138,6 +139,9 @@ export const InstructionFunctions: Map<string, InstructionFunction> = new Map<st
     }],
     ["move", (instr: Instruction): void => {
         registers[instr.rd] = registers[instr.rs];
+    }],
+    ["mul", (instr: Instruction): void => {
+        registers[instr.rd] = registers[instr.rs] * registers[instr.rt];
     }]
 ]);
 
@@ -182,5 +186,6 @@ export const InstructionOperands: Map<string, Operand[]> = new Map([
     // pseudos
     ["li", ["rs", "imm"]],
     ["la", ["rs", "imm"]],
-    ["move", ["rd", "rs"]]
+    ["move", ["rd", "rs"]],
+    ["mul", ["rd", "rs", "rt"]]
 ]);

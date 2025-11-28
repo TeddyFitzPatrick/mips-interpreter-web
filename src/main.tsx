@@ -10,10 +10,31 @@ export let numberFormat: number = 10; // DEFAULT = Decimal
 
 function Editor(){
   const editorRef = useRef<HTMLDivElement | null>(null);
+
+  const defaultCode: string=
+`start:
+  li    $a0, 5
+  jal   fac       # calculate 5! -> 120
+  move  $s0, $v0
+  j     done
+fac:
+  li    $v0, 1
+  # 0! = 1! = 1 base case
+  beq   $a0, $v0, fac_done
+  beq   $a0, $zero, fac_done
+fac_loop:
+  mul   $v0, $v0, $a0
+  addi  $a0, $a0, -1
+  bne   $a0, $zero, fac_loop
+fac_done: 
+  jr    $ra
+done:
+  # $s0 will store 5! = 120
+`;
   useEffect(() => {
     if (!editorRef.current) return;
     textEditor = new EditorView({
-      doc: "li $t9, 10\nmove $t1, $zero\nloop:\nbeq $t9, $zero, done\naddi $t9, $t9, -1\naddi $t1, $t1, 1\nj loop\ndone:\n",
+      doc: defaultCode,
       extensions: [keymap.of(defaultKeymap), lineNumbers(), gutter({class: "cm-mygutter"})],
       parent: editorRef.current
     });

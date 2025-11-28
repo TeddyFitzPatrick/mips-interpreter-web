@@ -63,6 +63,7 @@ export const runProgram = (programText: string): void => {
     let counter = 0;
     while ($pc < programInstructions.length){
       const programInstruction = programInstructions[$pc];
+
       // retrieve the function's execution function (e.g. add => {rd = rs + rt})
       let originalPC = $pc;
       const instructionFunction = InstructionFunctions.get(programInstruction.name);
@@ -119,7 +120,6 @@ export const resetProgram = (): void => {
 }
 
 export const parse = (programText: string): Instruction[] => {
-
   console.log("TEXT: {", programText + "}");
   let lineNumber: number = 0;
   const programLines = programText
