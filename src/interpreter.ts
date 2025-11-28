@@ -43,7 +43,7 @@ export const registerNames: string[] = [
 export let $pc = 0, $hi = 0, $lo = 0;
 
 // Symbol table
-const symtab: Map<string, number> = new Map<string, number>();
+export const symtab: Map<string, number> = new Map<string, number>();
 
 // Program instructions
 let programInstructions: Instruction[] = [];
@@ -51,21 +51,29 @@ let programInstructions: Instruction[] = [];
 // Execute the program 
 export const runProgram = (programText: string): void => {
   // parse the program text into a list of instructions
-  const programInstructions: Instruction[] = parse(programText);
+  programInstructions = parse(programText);
   console.log("Instructions:",programInstructions);
+  console.log("Symtab:",symtab);
   // no instructions to execute
   if (programInstructions.length === 0) return;
   // execute the program instructions
+  let counter = 0;
   while ($pc < programInstructions.length){
     const programInstruction = programInstructions[$pc];
     // retrieve the function's execution function (e.g. add => {rd = rs + rt})
-    const instructionFunction = InstructionFunctions.get(programInstruction.name)!;
+    let originalPC = $pc;
+    const instructionFunction = InstructionFunctions.get(programInstruction.name);
+    if (instructionFunction === undefined) throw new Error(`Illegal Function: ${programInstruction.name}`);
     // run the function with operands
     instructionFunction(programInstruction);
     // $zero can not change value
     registers[0] = 0;
-    // increment the program counter
-    $pc += 1; // += 4 if this were a byte-addressable array  
+    // increment the program counter if the instruction didn't change it
+    if (originalPC === $pc){
+      $pc += 1; // += 4 if this were a byte-addressable array  
+    }
+    counter++;
+    if (counter > 100) break;
   };
   // finish executing
   $pc = 0;
@@ -74,14 +82,22 @@ export const runProgram = (programText: string): void => {
   updateRegisterDisplay();
 }
 
-export const stepProgam = (): void => {
-  // TODO
-  $pc += 1;
+// export const stepProgam = (programText: string): void => {
+//   if (programInstructions.length === 0){
+//   }
+// }
+
+export const resetProgram = (): void => {
+  registers.forEach((_value, index) => {
+    registers[index] = 0;
+    $pc = 0;
+  });
+  updateRegisterDisplay();
 }
 
 export const parse = (programText: string): Instruction[] => {
   let lineNumber: number = 0;
-  return programText
+  const programLines = programText
     .split("\n")
     .map(line => {
       // Remove trailing & leading whitespace, normalize whitespace, remove comments
@@ -89,32 +105,53 @@ export const parse = (programText: string): Instruction[] => {
       // Add labels to the symble tab
       return cleanLine
     })
-    .filter(line => line !== "") // remove empty lines
+    .filter(line => line !== "") // remove empty lines after removing whitespace/comments
     .map(line => {
-      console.log("line:",line);
-      // Convert the list of text lines to a list of instruction types
-      const firstSpaceIndex = line.indexOf(" ");
-      const instructionName = line.substring(0, firstSpaceIndex).toLowerCase();
-      const instructionArgs = line.substring(firstSpaceIndex).replace(/\s+/g, "").split(",");
-      const instructionOperands: Operand[] = InstructionOperands.get(instructionName)!;
-      const instruction: Instruction = {
-        name: instructionName, rs: 0, rt: 0, rd: 0, shamt: 0, imm: 0, address: 0
-      };
-      for (let operandIndex = 0; operandIndex < instructionOperands.length; operandIndex++){
-        const instructionArg: string = instructionArgs[operandIndex];
-        const instructionOperand: Operand = instructionOperands[operandIndex];
-        // convert string arguments to operands (e.g. "$v0" -> 2, "555" -> 555)
-        instruction[instructionOperand] = ["rs", "rt", "rd"].includes(instructionOperand) 
-          ? parseRegisterOperand(instructionArg)
-          : parseNumericalOperand(instructionArg);
+      let colonIndex = line.indexOf(":");
+      while (colonIndex !== -1){
+        if (colonIndex === 0) throw new Error(`Syntax Error, Illegal Label`);
+        let label = line.substring(0, colonIndex).trim();
+        line = line.substring(colonIndex + 1).trim();
+        // Label names can not have whitespace in them
+        if (/\s/.test(label)) throw new Error (`Invalid label ${label}`);
+        // Add the label to the symtab
+        symtab.set(label, lineNumber);
+        colonIndex = line.indexOf(":");
       }
-      // Increment the line number
-      lineNumber++;
+      if (line !== "") lineNumber++;
+      return line;
+    })
+    .filter(line => line !== "") // remove empty lines after removing labels
+  // If after removing whitespace, comments, and labels, there are no instructions
+  if (programLines.length === 0) return [];
+  // Convert each line into an instruction
+  return programLines.map(line => {
+    const firstSpaceIndex = line.indexOf(" ");
+    const instructionName = line.substring(0, firstSpaceIndex).toLowerCase();
+    const instructionArgs = line.substring(firstSpaceIndex).replace(/\s+/g, "").split(",");
+    const instructionOperands: Operand[] = InstructionOperands.get(instructionName)!;
+    const instruction: Instruction = {
+      name: instructionName, rs: 0, rt: 0, rd: 0, shamt: 0, imm: 0, address: 0
+    };
+    for (let operandIndex = 0; operandIndex < instructionOperands.length; operandIndex++){
+      const instructionArg: string = instructionArgs[operandIndex];
+      const instructionOperand: Operand = instructionOperands[operandIndex];
+      // convert string arguments to operands (e.g. "$v0" -> 2, "555" -> 555)
+      instruction[instructionOperand] = ["rs", "rt", "rd"].includes(instructionOperand) 
+        ? parseRegisterOperand(instructionArg)
+        : parseNumericalOperand(instructionArg);
+    }
+    // Increment the line number
+    lineNumber++;
     return instruction;
   });
 }
 
 const parseRegisterOperand = (opText: string): number => {
+  // Register takes the form of $0, $1, ..., $31
+  if (Number.isFinite(+opText.substring(1))){
+    return Number(opText.substring(1));
+  }
   const register = registerNames.indexOf(opText);
   if (register === -1) throw new Error(`Invalid register operand ${opText} `);
   return register;
@@ -124,7 +161,7 @@ const parseNumericalOperand = (opText: string): number => {
   // label address value
   if (!Number.isFinite(+opText)){
     const labelAddress = symtab.get(opText);
-    if (labelAddress === undefined) throw new Error(`Invalid label ${opText} `);
+    if (labelAddress === undefined) throw new Error(`Invalid label ${opText}`);
     return labelAddress;
   }
   // immediate numerical value
@@ -133,12 +170,8 @@ const parseNumericalOperand = (opText: string): number => {
   return numericalValue;
 }
 
-export const resetProgram = (): void => {
-  registers.forEach((_value, index) => {
-    registers[index] = 0;
-    $pc = 0;
-  });
-  updateRegisterDisplay();
+export const changeProgramCounter = (newPC: number): void => {
+  $pc = newPC;
 }
 
 export const getRegisterOutput = (register: number): string => {

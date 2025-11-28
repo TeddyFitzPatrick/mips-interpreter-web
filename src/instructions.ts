@@ -1,4 +1,4 @@
-import { registers, $pc, $hi, $lo } from "./interpreter.ts";
+import { registers, registerNames, symtab, changeProgramCounter, $pc, $hi, $lo } from "./interpreter.ts";
 
 export type Instruction = {
   name: string,    // e.g. add, lw, sw
@@ -46,10 +46,19 @@ export const InstructionFunctions: Map<string, InstructionFunction> = new Map<st
     // "srav",
     // "mult",
     // "div",
-    // "mfhi",
-    // "mflo",
-    // "jr",
-    // "jalr",
+    ["mfhi", (instr: Instruction): void => {
+        registers[instr.rd] = $hi;
+    }],
+    ["mflo", (instr: Instruction): void => {
+        registers[instr.rd] = $lo;
+    }],
+    ["jr", (instr: Instruction): void => {
+        changeProgramCounter(instr.rs);
+    }],
+    ["jalr", (instr: Instruction): void => {
+        changeProgramCounter(instr.rs);
+        registers[registerNames.indexOf("$ra")] = $pc + 1;
+    }],
     ["addi", (instr: Instruction): void => {
         registers[instr.rt] = registers[instr.rs] + instr.imm;
     }],
@@ -72,10 +81,23 @@ export const InstructionFunctions: Map<string, InstructionFunction> = new Map<st
     // "sb",
     // "sh",
     // "sw",
-    // "beq",
-    // "bne",
-    // "j",
-    // "jal",
+    ["beq", (instr: Instruction): void => {
+        if (registers[instr.rs] === registers[instr.rt]){
+            changeProgramCounter(instr.imm);
+        }
+    }],
+    ["bne", (instr: Instruction): void => {
+        if (registers[instr.rs] !== registers[instr.rt]){
+            changeProgramCounter(instr.imm);
+        }
+    }],
+    ["j", (instr: Instruction): void => {
+        changeProgramCounter(instr.address);
+    }],
+    ["jal", (instr: Instruction): void => {
+        changeProgramCounter(instr.address);
+        registers[registerNames.indexOf("$ra")] = $pc + 1;
+    }],
 
     // Pseudos
     ["li", (instr: Instruction): void => {
@@ -107,7 +129,7 @@ export const InstructionOperands: Map<string, Operand[]> = new Map([
     ["mfhi", ["rd"]],
     ["mflo", ["rd"]],
     ["jr", ["rs"]],
-    ["jalr", ["rd", "rs"]],
+    ["jalr", ["rs"]],
     ["addi", ["rt", "rs", "imm"]],
     ["andi", ["rt", "rs", "imm"]],
     ["ori", ["rt", "rs", "imm"]],

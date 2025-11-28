@@ -2,7 +2,7 @@
 
 /* codemirror editor */
 .cm-editor{
-    @apply bg-color1 w-full h-full text-lg
+    @apply bg-color1 w-full h-full text-lg min-h-96
 }
 
 .cm-editor.cm-s-dark {
