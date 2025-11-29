@@ -46,13 +46,23 @@ export const InstructionFunctions: Map<string, InstructionFunction> = new Map<st
     // "sllv",
     // "srlv",
     // "srav",
-    // "mult",
-    // "div",
+    ["mult", (instr: Instruction): void => {
+        // signed 32-bit multiplication
+        const product = BigInt((registers[instr.rs] << 0) | 0) * BigInt((registers[instr.rt] << 0) | 0);
+        registers[registerNames.indexOf("$hi")] = Number(product & BigInt(0xFFFFFFFF))
+        registers[registerNames.indexOf("$lo")] = Number((product >> BigInt(32)) & BigInt(0xFFFFFFFF));
+    }],
+    ["div", (instr: Instruction): void => {
+        // $lo holds the quotient
+        // $hi holds the remainder
+        registers[registerNames.indexOf("$lo")] = registers[instr.rs] / registers[instr.rt];
+        registers[registerNames.indexOf("$hi")] = registers[instr.rs ] % registers[instr.rt];
+    }],
     ["mfhi", (instr: Instruction): void => {
-        registers[instr.rd] = $hi;
+        registers[instr.rd] = registers[registerNames.indexOf("$hi")];
     }],
     ["mflo", (instr: Instruction): void => {
-        registers[instr.rd] = $lo;
+        registers[instr.rd] = registers[registerNames.indexOf("$lo")];
     }],
     ["jr", (instr: Instruction): void => {
         changeProgramCounter(registers[instr.rs]);
@@ -93,7 +103,7 @@ export const InstructionFunctions: Map<string, InstructionFunction> = new Map<st
         if (typeof instr.imm === "number") throw new Error(`Invalid address ${instr.imm} for beq instruction`);
         // Verify the label is in the symtab
         const newPC = symtab.get(instr.imm);
-        if (newPC === undefined) throw new Error(`Invalid label ${instr.imm}`);
+        if (newPC === undefined) throw new Error(`Label ${instr.imm} not found`);
         if (registers[instr.rs] === registers[instr.rt]){
             changeProgramCounter(newPC);
         }
@@ -112,7 +122,7 @@ export const InstructionFunctions: Map<string, InstructionFunction> = new Map<st
         if (typeof instr.address === "number") throw new Error(`Invalid address ${instr.address} for j instruction`);
         // Verify the label is in the symtab
         const newPC = symtab.get(instr.address);
-        if (newPC === undefined) throw new Error(`Invalid label ${instr.imm}`);
+        if (newPC === undefined) throw new Error(`Label ${instr.address} not found`);
         changeProgramCounter(newPC);
     }],
     ["jal", (instr: Instruction): void => {
@@ -121,7 +131,7 @@ export const InstructionFunctions: Map<string, InstructionFunction> = new Map<st
         registers[registerNames.indexOf("$ra")] = $pc + 4;
         // Verify the label is in the symtab
         const newPC = symtab.get(instr.address);
-        if (newPC === undefined) throw new Error(`Invalid label ${instr.imm}`);
+        if (newPC === undefined) throw new Error(`Label ${instr.imm} not found`);
         changeProgramCounter(newPC);
     }],
     // Pseudos
@@ -133,7 +143,7 @@ export const InstructionFunctions: Map<string, InstructionFunction> = new Map<st
         if (typeof instr.imm === "number") throw new Error(`Illegal immediate value ${instr.imm} for la instruction`)
         // Verify the label is in the symtab
         const address = symtab.get(instr.imm);
-        if (address === undefined) throw new Error(`Invalid label ${instr.imm}`);
+        if (address === undefined) throw new Error(`Label ${instr.imm} not found`);
         registers[instr.rs] = address;
     }],
     ["move", (instr: Instruction): void => {
@@ -146,7 +156,25 @@ export const InstructionFunctions: Map<string, InstructionFunction> = new Map<st
 
 export type Operand = keyof Omit<Instruction, "name">;
 
+export type OperandType = 
+    REG = ; |
+    ...
+
 export const InstructionOperands: Map<string, Operand[]> = new Map([
+
+
+
+
+
+
+    // TODO:  ADD ACTUAL OPERAND TYPES   
+        .......................
+        [][][][][]]
+
+
+
+
+
     ["add", ["rd", "rs", "rt"]],
     ["sub", ["rd", "rs", "rt"]],
     ["and", ["rd", "rs", "rt"]],

@@ -38,12 +38,13 @@ export const registerNames: string[] = [
   "$sp",   // 29
   "$fp",   // 30
   "$ra",   // 31
+  "$pc",   // registers not accessible to users
+  "$hi",
+  "$lo"
 ];
-// Non-accessible registers
-export let $pc = 0, $hi = 0, $lo = 0;
 
 // Symbol table
-export const symtab: Map<string, number> = new Map<string, number>();
+export let symtab: Map<string, number> = new Map<string, number>();
 
 // Program instructions
 let programInstructions: Instruction[] = [];
@@ -61,10 +62,11 @@ export const runProgram = (programText: string): void => {
     if (programInstructions.length === 0) return;
     // execute the program instructions
     let counter = 0;
-    while ($pc / 4 < programInstructions.length){
-      const programInstruction = programInstructions[$pc / 4];
+    let instructionIndex: number;
+    while ((instructionIndex = registers[registerNames.indexOf("$pc")] / 4) < programInstructions.length){
+      const programInstruction = programInstructions[instructionIndex];
       // retrieve the function's execution function (e.g. add => {rd = rs + rt})
-      let originalPC = $pc;
+      let originalPC = instructionIndex;
       const instructionFunction = InstructionFunctions.get(programInstruction.name);
       if (instructionFunction === undefined) throw new Error(`Illegal Function: ${programInstruction.name}`);
       // run the function with operands
@@ -72,22 +74,19 @@ export const runProgram = (programText: string): void => {
       // $zero can not change value
       registers[0] = 0;
       // increment the program counter if the instruction didn't change it
-      if (originalPC === $pc){
-        $pc += 4; 
+      if (originalPC === registers[registerNames.indexOf("$pc")]){
+        registers[registerNames.indexOf("$pc")] += 4; 
       }
       counter++;
       if (counter > 100) break;
     };
     // finish executing
-    $pc = 0;
-    console.log("finish execution");
-    // update the UI registers
+    console.log("successful program execution");
+    // write the final register contents to the UI
     updateRegisterDisplay();
-    // Clear error output on successful execution
-    errorOutput.textContent = "";
   } catch (error: unknown){
+    console.log("failed program execution")
     // Parsing or program execution failure
-    resetProgram();
     if (error instanceof Error){
       errorOutput.textContent = error.message;
     } else if (typeof error === "string"){
@@ -96,6 +95,8 @@ export const runProgram = (programText: string): void => {
       console.log("Error: ", error);
       console.log("Unknown error type", typeof error);
     }
+  } finally {
+    resetProgram();
   }
 }
 
@@ -112,14 +113,12 @@ export const resetProgram = (): void => {
   // reset registers to 0
   registers.forEach((_value, index) => {
     registers[index] = 0;
-    $pc = 0;
   });
-  // update the register display
-  updateRegisterDisplay();
+  // reset symbol table
+  symtab = new Map<string, number>(); 
 }
 
 export const parse = (programText: string): Instruction[] => {
-  console.log("TEXT: {", programText + "}");
   let lineNumber: number = 0;
   const programLines = programText
     .split("\n")
@@ -136,7 +135,8 @@ export const parse = (programText: string): Instruction[] => {
         // Remove leading whitespace before the label
         let label = line.slice(0, colonIndex).replace(/^\s+/, "");
         // Label validation
-        validateLabel(label);
+        const validateResponse = isValidLabel(label);
+        if (typeof validateResponse === "string") throw new Error (validateResponse);
         // Add the label to the symtab
         symtab.set(label, lineNumber * 4);
         // Cut the label out of the line and repeat for other labels
@@ -162,12 +162,27 @@ export const parse = (programText: string): Instruction[] => {
     const instruction: Instruction = {
       name: instructionName, rs: 0, rt: 0, rd: 0, shamt: 0, imm: 0, address: 0
     }
+    // Build the mismatching arity error output
+    const operandFormat: string[] = [];
+    for (const instructionOperand of instructionOperands){
+      if (["rs", "rt", "rd"].includes(instructionOperand)){
+        operandFormat.push("Register");
+      } else if (["imm", "address", "shamt"].includes(instructionOperand)){
+        operandFormat.push("Immediate/Address");
+      }
+    }
+    // Mismatching arity error
+    if (operandFormat.length !== instructionArgs.length){
+      throw new Error(
+        `Instruction "${instructionName}" expects ${operandFormat.length} arguments, got ${instructionArgs.length}\n(${instructionName} ${operandFormat.join(", ")})`
+      )
+    }
+
     for (let operandIndex = 0; operandIndex < instructionOperands.length; operandIndex++){
       const instructionArg: string = instructionArgs[operandIndex];
       const instructionOperand: Operand = instructionOperands[operandIndex];
       // convert string argument representation to operands (e.g. "$v0" -> 2, "555" -> 555, "loop:" -> 24)
-
-      if (["rs", "rt", "rd"].includes(instructionOperand)){
+      if (operandFormat[operandIndex] === "Register"){
         instruction[instructionOperand] = parseRegisterOperand(instructionArg);
       }
       else if (isNumeric(instructionArg)){
@@ -175,7 +190,6 @@ export const parse = (programText: string): Instruction[] => {
       }
       else if (instructionOperand === "address" || instructionOperand === "imm"){
         // label argument
-        validateLabel(instructionArg);
         instruction[instructionOperand] = instructionArg;
       } else{
         throw new Error(`Invalid argument ${instructionArg} for instruction ${instructionName} operand ${instructionOperand}`);
@@ -202,19 +216,33 @@ const parseNumericalOperand = (opText: string): number => {
   return +opText;
 }
 
-const validateLabel = (label: string): void => {
+const isNumeric = (numberRepresentation: string): boolean => {
+  return numberRepresentation.trim() !== "" && Number.isFinite(+numberRepresentation);
+}
+
+const isValidRegister = (regText: string): boolean | string => {
+  if (regText[0] !== "$") return `Invalid register ${regText}, must start with $`;
+  const isSymbolicRegister = (registerNames.indexOf(regText) !== -1);
+  regText = regText.slice(1);
+  const isNumericRegister = (isNumeric(regText) && 0 <= +regText && +regText <= 31);
+  if (!isSymbolicRegister && !isNumericRegister) return `Invalid register ${regText}`;
+  return true;
+}
+
+const isValidLabel = (label: string): boolean | string => {
   // No empty string labels
-  if (label === "") throw new Error(`Empty label`);
+  if (label === "") return `Empty label`;
   // No spaces in the label name
-  if (/\s/.test(label)) throw new Error (`Invalid label ${label}`);
+  if (/\s/.test(label)) return `Invalid label ${label}`;
   // Only letters or _ for the first character
-  if (!/^[A-Za-z_]$/.test(label[0])) throw new Error (`Illegal first character for label ${label}`);
+  if (!/^[A-Za-z_]$/.test(label[0])) return `Illegal first character for label ${label}`;
   // All subsequent characters in the label must be alphanumeric or _
   for (let index = 1; index < label.length; index++){
-    if (!/^[A-Za-z0-9_]$/.test(label[index])) throw new Error (`Illegal label ${label}, special characters not allowed`);
+    if (!/^[A-Za-z0-9_]$/.test(label[index])) return `Illegal label ${label}, special characters not allowed`;
   }
   // No duplicate labels
-  if (label in symtab) throw new Error(`Duplicate label ${label}`)
+  if (label in symtab) return `Duplicate label ${label}`;
+  return true;
 }
 
 export const changeProgramCounter = (newPC: number): void => {
@@ -233,6 +261,3 @@ export const updateRegisterDisplay = (): void => {
   }
 }
 
-const isNumeric = (numberRepresentation: string): boolean => {
-  return numberRepresentation.trim() !== "" && Number.isFinite(+numberRepresentation);
-}
