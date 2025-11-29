@@ -58,7 +58,7 @@ export const InstructionFunctions: Map<string, InstructionFunction> = new Map<st
         changeProgramCounter(registers[instr.rs]);
     }],
     ["jalr", (instr: Instruction): void => {
-        registers[registerNames.indexOf("$ra")] = $pc + 1;
+        registers[registerNames.indexOf("$ra")] = $pc + 4;
         changeProgramCounter(registers[instr.rs]);
     }],
     ["addi", (instr: Instruction): void => {
@@ -118,13 +118,12 @@ export const InstructionFunctions: Map<string, InstructionFunction> = new Map<st
     ["jal", (instr: Instruction): void => {
         if (typeof instr.address === "number") throw new Error(`Invalid address ${instr.address} for jal instruction`);
         // Store the next instruction in the $ra
-        registers[registerNames.indexOf("$ra")] = $pc + 1;
+        registers[registerNames.indexOf("$ra")] = $pc + 4;
         // Verify the label is in the symtab
         const newPC = symtab.get(instr.address);
         if (newPC === undefined) throw new Error(`Invalid label ${instr.imm}`);
         changeProgramCounter(newPC);
     }],
-
     // Pseudos
     ["li", (instr: Instruction): void => {
         if (typeof instr.imm === "string") throw new Error(`Illegal immediate value ${instr.imm} for li instruction`)

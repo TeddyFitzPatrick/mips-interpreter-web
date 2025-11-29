@@ -1,7 +1,7 @@
 import { numberFormat } from "./main.tsx";
 import {type Instruction, type Operand, InstructionFunctions, InstructionOperands} from "./instructions.ts";
 
-const MAX_REG_VALUE = Math.pow(2, 32) - 1;
+//const MAX_REG_VALUE = Math.pow(2, 32) - 1;
 
 // Registers
 export const registers: Uint32Array = new Uint32Array(32);
@@ -61,9 +61,8 @@ export const runProgram = (programText: string): void => {
     if (programInstructions.length === 0) return;
     // execute the program instructions
     let counter = 0;
-    while ($pc < programInstructions.length){
-      const programInstruction = programInstructions[$pc];
-
+    while ($pc / 4 < programInstructions.length){
+      const programInstruction = programInstructions[$pc / 4];
       // retrieve the function's execution function (e.g. add => {rd = rs + rt})
       let originalPC = $pc;
       const instructionFunction = InstructionFunctions.get(programInstruction.name);
@@ -74,7 +73,7 @@ export const runProgram = (programText: string): void => {
       registers[0] = 0;
       // increment the program counter if the instruction didn't change it
       if (originalPC === $pc){
-        $pc += 1; // += 4 if this were a byte-addressable array  
+        $pc += 4; 
       }
       counter++;
       if (counter > 100) break;
@@ -132,24 +131,16 @@ export const parse = (programText: string): Instruction[] => {
     })
     .filter(line => line !== "") // remove empty lines after removing whitespace/comments
     .map(line => {
-      let colonIndex = line.indexOf(":");
-      while (colonIndex !== -1){
-        // No empty string labels
-        if (colonIndex === 0) throw new Error(`Empty label`);
-        let label = line.substring(0, colonIndex).replace(/^\s+/, "");
-        line = line.substring(colonIndex + 1).trim();
+      let colonIndex;
+      while ((colonIndex = line.indexOf(":")) !== -1){
+        // Remove leading whitespace before the label
+        let label = line.slice(0, colonIndex).replace(/^\s+/, "");
         // Label validation
-        // No spaces in the label name
-        if (/\s/.test(label)) throw new Error (`Invalid label ${label}`);
-        // Only letters or _ for the first character
-        if (!/^[A-Za-z_]$/.test(label[0])) throw new Error (`Illegal first character for label ${label}`);
-        // All subsequent characters in the label must be alphanumeric or _
-        for (let index = 1; index < label.length; index++){
-          if (!/^[A-Za-z0-9_]$/.test(label[index])) throw new Error (`Illegal label ${label}, special characters not allowed`);
-        }
+        validateLabel(label);
         // Add the label to the symtab
-        symtab.set(label, lineNumber);
-        colonIndex = line.indexOf(":");
+        symtab.set(label, lineNumber * 4);
+        // Cut the label out of the line and repeat for other labels
+        line = line.slice(colonIndex + 1).trim();
       }
       if (line !== "") lineNumber++;
       return line;
@@ -175,6 +166,7 @@ export const parse = (programText: string): Instruction[] => {
       const instructionArg: string = instructionArgs[operandIndex];
       const instructionOperand: Operand = instructionOperands[operandIndex];
       // convert string argument representation to operands (e.g. "$v0" -> 2, "555" -> 555, "loop:" -> 24)
+
       if (["rs", "rt", "rd"].includes(instructionOperand)){
         instruction[instructionOperand] = parseRegisterOperand(instructionArg);
       }
@@ -182,6 +174,8 @@ export const parse = (programText: string): Instruction[] => {
         instruction[instructionOperand] = parseNumericalOperand(instructionArg);      
       }
       else if (instructionOperand === "address" || instructionOperand === "imm"){
+        // label argument
+        validateLabel(instructionArg);
         instruction[instructionOperand] = instructionArg;
       } else{
         throw new Error(`Invalid argument ${instructionArg} for instruction ${instructionName} operand ${instructionOperand}`);
@@ -206,6 +200,21 @@ const parseRegisterOperand = (opText: string): number => {
 const parseNumericalOperand = (opText: string): number => {
   if (!isNumeric(opText)) throw new Error(`Invalid numerical value ${opText}`);
   return +opText;
+}
+
+const validateLabel = (label: string): void => {
+  // No empty string labels
+  if (label === "") throw new Error(`Empty label`);
+  // No spaces in the label name
+  if (/\s/.test(label)) throw new Error (`Invalid label ${label}`);
+  // Only letters or _ for the first character
+  if (!/^[A-Za-z_]$/.test(label[0])) throw new Error (`Illegal first character for label ${label}`);
+  // All subsequent characters in the label must be alphanumeric or _
+  for (let index = 1; index < label.length; index++){
+    if (!/^[A-Za-z0-9_]$/.test(label[index])) throw new Error (`Illegal label ${label}, special characters not allowed`);
+  }
+  // No duplicate labels
+  if (label in symtab) throw new Error(`Duplicate label ${label}`)
 }
 
 export const changeProgramCounter = (newPC: number): void => {
