@@ -1,10 +1,8 @@
 import { numberFormat } from "./main.tsx";
-import {type Instruction, type Operand, InstructionFunctions, InstructionOperands} from "./instructions.ts";
-
-//const MAX_REG_VALUE = Math.pow(2, 32) - 1;
+import {type Instruction, InstructionSpec} from "./instructions.ts";
+const DATA_MEM_SIZE = 8_000_000; // (~8 MB)
 
 // Registers
-export const registers: Uint32Array = new Uint32Array(32);
 export const registerNames: string[] = [
   "$zero", // 0
   "$at",   // 1 (reserved)
@@ -42,81 +40,17 @@ export const registerNames: string[] = [
   "$hi",
   "$lo"
 ];
+export const registers: Int32Array = new Int32Array(registerNames.length);
+
+
+// Data Memory 
+export let DataMemory: Int8Array = new Int8Array(DATA_MEM_SIZE);
 
 // Symbol table
-export let symtab: Map<string, number> = new Map<string, number>();
+let symtab: Map<string, number> = new Map<string, number>();
 
 // Program instructions
-let programInstructions: Instruction[] = [];
-
-// Execute the program 
-export const runProgram = (programText: string): void => {
-  const errorOutput: HTMLElement | null = document.getElementById("errorOutput");
-  if (errorOutput === null) return;
-  try{
-    // parse the program text into a list of instructions
-    programInstructions = parse(programText);
-    console.log("Instructions:",programInstructions);
-    console.log("Symtab:",symtab);
-    // no instructions to execute
-    if (programInstructions.length === 0) return;
-    // execute the program instructions
-    let counter = 0;
-    let instructionIndex: number;
-    while ((instructionIndex = registers[registerNames.indexOf("$pc")] / 4) < programInstructions.length){
-      const programInstruction = programInstructions[instructionIndex];
-      // retrieve the function's execution function (e.g. add => {rd = rs + rt})
-      let originalPC = instructionIndex;
-      const instructionFunction = InstructionFunctions.get(programInstruction.name);
-      if (instructionFunction === undefined) throw new Error(`Illegal Function: ${programInstruction.name}`);
-      // run the function with operands
-      instructionFunction(programInstruction);
-      // $zero can not change value
-      registers[0] = 0;
-      // increment the program counter if the instruction didn't change it
-      if (originalPC === registers[registerNames.indexOf("$pc")]){
-        registers[registerNames.indexOf("$pc")] += 4; 
-      }
-      counter++;
-      if (counter > 100) break;
-    };
-    // finish executing
-    console.log("successful program execution");
-    // write the final register contents to the UI
-    updateRegisterDisplay();
-  } catch (error: unknown){
-    console.log("failed program execution")
-    // Parsing or program execution failure
-    if (error instanceof Error){
-      errorOutput.textContent = error.message;
-    } else if (typeof error === "string"){
-      errorOutput.textContent = error;
-    } else {
-      console.log("Error: ", error);
-      console.log("Unknown error type", typeof error);
-    }
-  } finally {
-    resetProgram();
-  }
-}
-
-// export const stepProgam = (programText: string): void => {
-//   if (programInstructions.length === 0){
-//   }
-// }
-
-export const resetProgram = (): void => {
-  // reset error output
-  const errorOutput: HTMLElement | null = document.getElementById("errorOutput");
-  if (errorOutput === null) return;
-  errorOutput.textContent = "";
-  // reset registers to 0
-  registers.forEach((_value, index) => {
-    registers[index] = 0;
-  });
-  // reset symbol table
-  symtab = new Map<string, number>(); 
-}
+let InstructionMemory: Instruction[] = [];
 
 export const parse = (programText: string): Instruction[] => {
   let lineNumber: number = 0;
@@ -135,7 +69,7 @@ export const parse = (programText: string): Instruction[] => {
         // Remove leading whitespace before the label
         let label = line.slice(0, colonIndex).replace(/^\s+/, "");
         // Label validation
-        const validateResponse = isValidLabel(label);
+        const validateResponse = validateLabelName(label);
         if (typeof validateResponse === "string") throw new Error (validateResponse);
         // Add the label to the symtab
         symtab.set(label, lineNumber * 4);
@@ -154,46 +88,52 @@ export const parse = (programText: string): Instruction[] => {
     const firstSpaceIndex = line.indexOf(" ");
     if (firstSpaceIndex === -1) throw new Error(`Invalid line "${line}", missing a space`)
     const instructionName = line.slice(0, firstSpaceIndex).toLowerCase();
-    const instructionArgs = line.slice(firstSpaceIndex).replace(/\s+/g, "").split(",");
+    const lineArguments = line.slice(firstSpaceIndex).replace(/\s+/g, "").split(",").filter(arg => arg !== "");
     // Get the instruction's operands (e.g. addi => ["rs", "rt", "imm"])
-    const instructionOperands = InstructionOperands.get(instructionName);
-    if (instructionOperands === undefined) throw new Error(`Instruction operands for ${instructionName} could not be determined.`);
+    const instructionSpec = InstructionSpec.get(instructionName);
+    if (instructionSpec === undefined) throw new Error(`Instruction ${instructionName} not found`);
+    const operandFields = instructionSpec.fields;
+    const operandTypes = instructionSpec.types;
     // Generate the line's corresponding instruction
     const instruction: Instruction = {
-      name: instructionName, rs: 0, rt: 0, rd: 0, shamt: 0, imm: 0, address: 0
+      name: instructionName, rs: -1, rt: -1, rd: -1, shamt: -1, imm: -1, target: -1
     }
-    // Build the mismatching arity error output
-    const operandFormat: string[] = [];
-    for (const instructionOperand of instructionOperands){
-      if (["rs", "rt", "rd"].includes(instructionOperand)){
-        operandFormat.push("Register");
-      } else if (["imm", "address", "shamt"].includes(instructionOperand)){
-        operandFormat.push("Immediate/Address");
-      }
-    }
-    // Mismatching arity error
-    if (operandFormat.length !== instructionArgs.length){
+    // Arity mismatch
+    if (lineArguments.length !== operandFields.length){
       throw new Error(
-        `Instruction "${instructionName}" expects ${operandFormat.length} arguments, got ${instructionArgs.length}\n(${instructionName} ${operandFormat.join(", ")})`
-      )
+        `Invalid argument count for ${instructionName} (expected ${operandFields.length}, got ${lineArguments.length})\n` +
+        `Usage: ${instructionName} ${operandFields.join(", ")}`
+      );
     }
-
-    for (let operandIndex = 0; operandIndex < instructionOperands.length; operandIndex++){
-      const instructionArg: string = instructionArgs[operandIndex];
-      const instructionOperand: Operand = instructionOperands[operandIndex];
-      // convert string argument representation to operands (e.g. "$v0" -> 2, "555" -> 555, "loop:" -> 24)
-      if (operandFormat[operandIndex] === "Register"){
-        instruction[instructionOperand] = parseRegisterOperand(instructionArg);
+    // Put the line arguments into the instruction's fields
+    for (let index = 0; index <= operandFields.length; index++){
+      const lineArgument = lineArguments[index];
+      const field = operandFields[index];
+      const operandType = operandTypes[index];
+      if (operandType === "Register") {
+        if (!isRegister(lineArgument)) throw new Error(`Invalid register argument ${lineArgument}`);
+        instruction[field] = (registerNames.includes(lineArgument)) ? registerNames.indexOf(lineArgument) : +lineArgument.slice(1);
+      } else if (operandType === "UImm16") {
+        if (!isUImm16(lineArgument)) throw new Error(`Invalid UImm16 argument ${lineArgument}`);
+        instruction[field] = +lineArgument;
+      } else if (operandType === "Imm16") {
+        if (!isImm16(lineArgument)) throw new Error(`Invalid Imm16 argument ${lineArgument}`);
+        instruction[field] = +lineArgument;
+      } else if (operandType === "UImm32") {
+        if (!isUImm32(lineArgument)) throw new Error(`Invalid UImm32 argument ${lineArgument}`);
+        instruction[field] = +lineArgument;
+      } else if (operandType === "Imm32") {
+        if (!isImm32(lineArgument)) throw new Error(`Invalid Imm32 argument ${lineArgument}`);
+        instruction[field] = +lineArgument;
+      } else if (operandType === "ShiftAmount") {
+        if (!isShiftAmount(lineArgument)) throw new Error(`Invalid ShiftAmount argument ${lineArgument}`);
+        instruction[field] = +lineArgument;
+      } else if (operandType === "Label") {
+        if (!isLabel(lineArgument)) throw new Error(`Invalid Label argument ${lineArgument}`);
+        instruction[field] = symtab.get(lineArgument)!;
       }
-      else if (isNumeric(instructionArg)){
-        instruction[instructionOperand] = parseNumericalOperand(instructionArg);      
-      }
-      else if (instructionOperand === "address" || instructionOperand === "imm"){
-        // label argument
-        instruction[instructionOperand] = instructionArg;
-      } else{
-        throw new Error(`Invalid argument ${instructionArg} for instruction ${instructionName} operand ${instructionOperand}`);
-      }
+      // Add the instruction to instruction memory
+      InstructionMemory.push(instruction);
     }
     // Increment the line number
     lineNumber++;
@@ -201,35 +141,50 @@ export const parse = (programText: string): Instruction[] => {
   });
 }
 
-const parseRegisterOperand = (opText: string): number => {
-  // Register takes the form of $0, $1, ..., $31
-  if (isNumeric(opText.substring(1))){
-    return +opText.substring(1);
-  }
-  const register = registerNames.indexOf(opText);
-  if (register === -1) throw new Error(`Invalid register operand ${opText} `);
-  return register;
+const isRegister = (text: string): boolean => {
+  // Disallow user access to special-purpose registers
+  if (text === "$pc" || text === "$hi" || text === "$lo") return false;
+  // Symbolic register (e.g. $v0)
+  if (registerNames.includes(text)) return true;
+  // Numeric register (e.g. $5)
+  if (text[0] === "$" && isNumeric(text.slice(1)) && 0 <= +text.slice(1) && +text.slice(1) <= 31) return true;
+  return false
 }
 
-const parseNumericalOperand = (opText: string): number => {
-  if (!isNumeric(opText)) throw new Error(`Invalid numerical value ${opText}`);
-  return +opText;
+const isUImm16 = (text: string): boolean => {
+  if (!isNumeric(text)) return false;
+  return 0 <= +text && +text <= Math.pow(2,16) - 1;
+}
+
+const isImm16 = (text: string): boolean => {
+  if (!isNumeric(text)) return false;
+  return -Math.pow(2,15) <= +text && +text <= Math.pow(2,15) - 1;
+}
+
+const isUImm32 = (text: string): boolean => {
+  if (!isNumeric(text)) return false;
+  return 0 <= +text && +text <= Math.pow(2,32) - 1;
+}
+
+const isImm32 = (text: string): boolean => {
+  if (!isNumeric(text)) return false;
+  return -Math.pow(2,31) <= +text && +text <= Math.pow(2,31) - 1;
+}
+
+const isShiftAmount = (text: string): boolean => {
+  if (!isNumeric(text)) return false;
+  return 0 <= +text && +text <= Math.pow(2,5) - 1;
+}
+
+const isLabel = (text: string): boolean => {
+  return symtab.has(text);
 }
 
 const isNumeric = (numberRepresentation: string): boolean => {
   return numberRepresentation.trim() !== "" && Number.isFinite(+numberRepresentation);
 }
 
-const isValidRegister = (regText: string): boolean | string => {
-  if (regText[0] !== "$") return `Invalid register ${regText}, must start with $`;
-  const isSymbolicRegister = (registerNames.indexOf(regText) !== -1);
-  regText = regText.slice(1);
-  const isNumericRegister = (isNumeric(regText) && 0 <= +regText && +regText <= 31);
-  if (!isSymbolicRegister && !isNumericRegister) return `Invalid register ${regText}`;
-  return true;
-}
-
-const isValidLabel = (label: string): boolean | string => {
+const validateLabelName = (label: string): boolean | string => {
   // No empty string labels
   if (label === "") return `Empty label`;
   // No spaces in the label name
@@ -245,8 +200,70 @@ const isValidLabel = (label: string): boolean | string => {
   return true;
 }
 
-export const changeProgramCounter = (newPC: number): void => {
-  $pc = newPC;
+export const runProgram = (programText: string): void => {
+  resetProgram(); // clear any previous runs
+  const errorOutput: HTMLElement | null = document.getElementById("errorOutput");
+  if (errorOutput === null) return;
+  try{
+    // parse the program text into a list of instructions
+    InstructionMemory = parse(programText);
+    console.log("Instructions:",InstructionMemory);
+    console.log("Symtab:",symtab);
+    // execute the program instructions
+    let counter = 0;
+    let instructionIndex: number;
+    while ((instructionIndex = registers[registerNames.indexOf("$pc")] / 4) < InstructionMemory.length){
+      console.log("index::",instructionIndex);
+      const instr = InstructionMemory[instructionIndex];
+      console.log(instr.name);
+      // retrieve the function's execution function (e.g. add => {rd = rs + rt})
+      const instructionFunction = InstructionSpec.get(instr.name)!.func;
+      // run the function with operands
+      instructionFunction(instr);
+      // $zero can not change value
+      registers[0] = 0;
+      // increment the program counter if the instruction didn't change it
+      if (instructionIndex === registers[registerNames.indexOf("$pc")] / 4){
+        registers[registerNames.indexOf("$pc")] += 4; 
+      }
+      counter++;
+      if (counter > 100) break;
+    };
+    // finish executing
+    console.log("successful program execution");
+    console.log(registers);
+    // write the final register contents to the UI
+    updateRegisterDisplay();
+  } catch (error: unknown){
+    console.log("failed program execution")
+    resetProgram();
+    // Parsing or program execution failure
+    if (error instanceof Error){
+      errorOutput.textContent = error.message;
+    } else if (typeof error === "string"){
+      errorOutput.textContent = error;
+    } else {
+      console.log("Error: ", error);
+      console.log("Unknown error type", typeof error);
+    }
+  }
+}
+
+export const resetProgram = (): void => {
+  // reset registers to 0
+  registers.forEach((_value, index) => {
+    registers[index] = 0;
+  });
+  // reset symbol table
+  symtab = new Map<string, number>();
+  // reset instruction memory
+  InstructionMemory = [];
+  // reset data memory 
+  DataMemory = new Int8Array(DATA_MEM_SIZE);
+  // reset error output
+  const errorOutput: HTMLElement | null = document.getElementById("errorOutput");
+  if (errorOutput === null) return;
+  errorOutput.textContent = "";
 }
 
 export const getRegisterOutput = (register: number): string => {

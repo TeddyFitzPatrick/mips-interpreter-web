@@ -8,11 +8,7 @@ let textEditor: EditorView;
 
 export let numberFormat: number = 10; // DEFAULT = Decimal
 
-function Editor(){
-  const editorRef = useRef<HTMLDivElement | null>(null);
-
-  const defaultCode: string=
-`start:
+const defaultCode = `start:
   li    $a0, 5
   jal   fac       # calculate 5! -> 120
   move  $s0, $v0
@@ -29,8 +25,10 @@ fac_loop:
 fac_done: 
   jr    $ra
 done:
-  # $s0 will store 5! = 120
-`;
+  # $s0 will store 5! = 120`;
+
+function Editor(){
+  const editorRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     if (!editorRef.current) return;
     textEditor = new EditorView({
@@ -93,23 +91,25 @@ function RegisterView(){
   );
 }
 
-createRoot(document.getElementById('root')!).render(
-  <div className="flex flex-col sm:flex-row space-y-6 sm:space-y-0 w-full max-w-screen min-h-screen h-fit bg-color4 p-4 space-x-4 text-slate-800">
-    <div className="w-full sm:w-1/2 h-full flex flex-col space-y-4">
-      {/* Editor  */}
-      <div className="flex flex-col w-full h-full rounded-xl bg-color3 p-4 shadow-xl">
-        <Editor/> 
-        <Buttons/>
+const root = document.getElementById("root");
+if (root !== undefined && root !== null && !root.hasChildNodes()){
+  createRoot(document.getElementById('root')!).render(
+    <div className="flex flex-col sm:flex-row space-y-6 sm:space-y-0 w-full max-w-screen min-h-screen h-fit bg-color4 p-4 space-x-4 text-slate-800">
+      <div className="w-full sm:w-1/2 h-full flex flex-col space-y-4">
+        {/* Editor  */}
+        <div className="flex flex-col w-full h-full rounded-xl bg-color3 p-4 shadow-xl">
+          <Editor/> 
+          <Buttons/>
+        </div>
+        {/* Error Output */}
+        <div className="bg-color3 w-full h-full rounded-xl shadow-xl p-4 space-y-2">
+          <h1 className="font-bold text-xl">
+            Error Output
+          </h1>
+          <textarea id="errorOutput" className="resize-none w-full h-full text-red-500 rounded-lg p-2 text-red bg-color1 font-bold"></textarea>
+        </div>
       </div>
-      {/* Error Output */}
-      <div className="bg-color3 w-full h-full rounded-xl shadow-xl p-4 space-y-2">
-        <h1 className="font-bold text-xl">
-          Error Output
-        </h1>
-        <textarea id="errorOutput" className="resize-none w-full h-full text-red-500 rounded-lg p-2 text-red bg-color1 font-bold" disabled></textarea>
-      </div>
+      <RegisterView/>
     </div>
-
-    <RegisterView/>
-  </div>
-)
+  )
+}

@@ -1,95 +1,172 @@
-import { registers, registerNames, symtab, changeProgramCounter, $pc, $hi, $lo } from "./interpreter.ts";
+import { registers, registerNames, DataMemory } from "./interpreter.ts";
 
 export type Instruction = {
-  name: string,    // e.g. add, lw, sw
-  rs: number,      // source 1 register
-  rt: number,      // source 2 register
-  rd: number,      // destination register
-  shamt: number,   // shift amount
-                   // the imm/addr of an I-type
-  imm: number | string,     
-                   // the 26-bit J-type addr
-  address: number | string 
+  name: string,    // corresponds to opcode      (6-bits)
+  rs: number,      // source 1 register          (5-bits)
+  rt: number,      // source 2 register          (5-bits)
+  rd: number,      // destination register       (5-bits)
+  shamt: number,   // shift amount               (5-bits)
+  imm: number,     // the imm/addr of an I-type  (16-bits)
+  target: number   // the 26-bit J-type addr     (26-bits)
 }
 
-type InstructionFunction = (instr: Instruction) => void;
+export type Operand = keyof Omit<Instruction, "name">;
 
-export const InstructionFunctions: Map<string, InstructionFunction> = new Map<string, InstructionFunction>([
-    ["add", (instr: Instruction): void => {
-        registers[instr.rd] = registers[instr.rs] + registers[instr.rt];
+export type OperandType = 
+    "Register" |
+    "UImm16" |
+    "Imm16" |
+    "UImm32" |
+    "Imm32" |
+    "ShiftAmount" |
+    "Label";
+
+export type InstructionFunction = (instr: Instruction) => void;
+
+export type InstructionSpecType = {
+    func: InstructionFunction,
+    fields: Operand[],
+    types: OperandType[],
+};
+
+export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
+    ["add", {
+        func: (instr: Instruction): void => {
+            registers[instr.rd] = registers[instr.rs] + registers[instr.rt];
+        },
+        fields: ["rd", "rs", "rt"],
+        types: ["Register", "Register", "Register"]
     }],
-    ["sub", (instr: Instruction): void => {
-        registers[instr.rd] = registers[instr.rs] - registers[instr.rt];
-    }],    
-    ["and", (instr: Instruction): void => {
-        registers[instr.rd] = registers[instr.rs] & registers[instr.rt];
+    ["sub", {
+        func: (instr: Instruction): void => {
+            registers[instr.rd] = registers[instr.rs] - registers[instr.rt];
+        },
+        fields: ["rd", "rs", "rt"],
+        types: ["Register", "Register", "Register"]
     }],
-    ["or", (instr: Instruction): void => {
-        registers[instr.rd] = registers[instr.rs] | registers[instr.rt];
+    ["and", {
+        func: (instr: Instruction): void => {
+            registers[instr.rd] = registers[instr.rs] & registers[instr.rt];
+        },
+        fields: ["rd", "rs", "rt"],
+        types: ["Register", "Register", "Register"]
     }],
-    ["xor", (instr: Instruction): void => {
-        registers[instr.rd] = registers[instr.rs] ^ registers[instr.rt];
+    ["or", {
+        func: (instr: Instruction): void => {
+            registers[instr.rd] = registers[instr.rs] | registers[instr.rt];
+        },
+        fields: ["rd", "rs", "rt"],
+        types: ["Register", "Register", "Register"]
     }],
-    ["nor", (instr: Instruction): void => {
-        registers[instr.rd] = ~(registers[instr.rs] | registers[instr.rt]);
+    ["xor", {
+        func: (instr: Instruction): void => {
+            registers[instr.rd] = registers[instr.rs] ^ registers[instr.rt];
+        },
+        fields: ["rd", "rs", "rt"],
+        types: ["Register", "Register", "Register"]
     }],
-    ["slt", (instr: Instruction): void => {
-        registers[instr.rd] = (registers[instr.rs] < registers[instr.rt]) ? 1 : 0;
+    ["nor", {
+        func: (instr: Instruction): void => {
+            registers[instr.rd] = ~(registers[instr.rs] | registers[instr.rt]);
+        },
+        fields: ["rd", "rs", "rt"],
+        types: ["Register", "Register", "Register"]
     }],
-    ["sll", (instr: Instruction): void => {
-        registers[instr.rd] = registers[instr.rt] << instr.shamt;
+    ["slt", {
+        func: (instr: Instruction): void => {
+            registers[instr.rd] = (registers[instr.rs] < registers[instr.rt]) ? 1 : 0;
+        },
+        fields: ["rd", "rs", "rt"],
+        types: ["Register", "Register", "Register"]
     }],
-    ["srl", (instr: Instruction): void => {
-        registers[instr.rd] = registers[instr.rt] >> instr.shamt;
-    }],    
+    ["sll", {
+        func: (instr: Instruction): void => {
+            registers[instr.rd] = registers[instr.rt] << instr.shamt;
+        },
+        fields: ["rd", "rt", "shamt"],
+        types: ["Register", "Register", "ShiftAmount"]
+    }],
+    ["srl", {
+        func: (instr: Instruction): void => {
+            registers[instr.rd] = registers[instr.rt] >> instr.shamt;
+        },
+        fields: ["rd", "rt", "shamt"],
+        types: ["Register", "Register", "ShiftAmount"]
+    }],
     // "sra"
     // "sllv",
     // "srlv",
     // "srav",
-    ["mult", (instr: Instruction): void => {
-        // signed 32-bit multiplication
-        const product = BigInt((registers[instr.rs] << 0) | 0) * BigInt((registers[instr.rt] << 0) | 0);
-        registers[registerNames.indexOf("$hi")] = Number(product & BigInt(0xFFFFFFFF))
-        registers[registerNames.indexOf("$lo")] = Number((product >> BigInt(32)) & BigInt(0xFFFFFFFF));
+    ["mult", {
+        func: (instr: Instruction): void => {
+            const product = BigInt((registers[instr.rs] << 0) | 0) * BigInt((registers[instr.rt] << 0) | 0);
+            registers[registerNames.indexOf("$hi")] = Number(product & BigInt(0xFFFFFFFF));
+            registers[registerNames.indexOf("$lo")] = Number((product >> BigInt(32)) & BigInt(0xFFFFFFFF));
+        },
+        fields: ["rs", "rt"],
+        types: ["Register", "Register"]
     }],
-    ["div", (instr: Instruction): void => {
-        // $lo holds the quotient
-        // $hi holds the remainder
-        registers[registerNames.indexOf("$lo")] = registers[instr.rs] / registers[instr.rt];
-        registers[registerNames.indexOf("$hi")] = registers[instr.rs ] % registers[instr.rt];
+    ["div", {
+        func: (instr: Instruction): void => {
+            registers[registerNames.indexOf("$lo")] = registers[instr.rs] / registers[instr.rt];
+            registers[registerNames.indexOf("$hi")] = registers[instr.rs] % registers[instr.rt];
+        },
+        fields: ["rs", "rt"],
+        types: ["Register", "Register"]
     }],
-    ["mfhi", (instr: Instruction): void => {
-        registers[instr.rd] = registers[registerNames.indexOf("$hi")];
+    ["mfhi", {
+        func: (instr: Instruction): void => {
+            registers[instr.rd] = registers[registerNames.indexOf("$hi")];
+        },
+        fields: ["rd"],
+        types: ["Register"]
     }],
-    ["mflo", (instr: Instruction): void => {
-        registers[instr.rd] = registers[registerNames.indexOf("$lo")];
+    ["mflo", {
+        func: (instr: Instruction): void => {
+            registers[instr.rd] = registers[registerNames.indexOf("$lo")];
+        },
+        fields: ["rd"],
+        types: ["Register"]
     }],
-    ["jr", (instr: Instruction): void => {
-        changeProgramCounter(registers[instr.rs]);
+    ["addi", {
+        func: (instr: Instruction): void => {
+            if (typeof instr.imm !== "number") throw new Error(`Invalid immediate ${instr.imm} for addi instruction`);
+            registers[instr.rt] = registers[instr.rs] + +instr.imm;
+        },
+        fields: ["rt", "rs", "imm"],
+        types: ["Register", "Register", "Imm16"]
     }],
-    ["jalr", (instr: Instruction): void => {
-        registers[registerNames.indexOf("$ra")] = $pc + 4;
-        changeProgramCounter(registers[instr.rs]);
+    ["andi", {
+        func: (instr: Instruction): void => {
+            if (typeof instr.imm !== "number") throw new Error(`Invalid immediate ${instr.imm} for andi instruction`);
+            registers[instr.rt] = registers[instr.rs] & +instr.imm;
+        },
+        fields: ["rt", "rs", "imm"],
+        types: ["Register", "Register", "UImm16"]
     }],
-    ["addi", (instr: Instruction): void => {
-        if (typeof instr.imm !== "number") throw new Error(`Invalid immediate ${instr.imm} for addi instruction`);
-        registers[instr.rt] = registers[instr.rs] + +instr.imm;
+    ["ori", {
+        func: (instr: Instruction): void => {
+            if (typeof instr.imm !== "number") throw new Error(`Invalid immediate ${instr.imm} for ori instruction`);
+            registers[instr.rt] = registers[instr.rs] | +instr.imm;
+        },
+        fields: ["rt", "rs", "imm"],
+        types: ["Register", "Register", "UImm16"]
     }],
-    ["andi", (instr: Instruction): void => {
-        if (typeof instr.imm !== "number") throw new Error(`Invalid immediate ${instr.imm} for andi instruction`);
-        registers[instr.rt] = registers[instr.rs] & +instr.imm;
-    }], 
-    ["ori", (instr: Instruction): void => {
-        if (typeof instr.imm !== "number") throw new Error(`Invalid immediate ${instr.imm} for ori instruction`);
-        registers[instr.rt] = registers[instr.rs] | +instr.imm;
+    ["xori", {
+        func: (instr: Instruction): void => {
+            if (typeof instr.imm !== "number") throw new Error(`Invalid immediate ${instr.imm} for xori instruction`);
+            registers[instr.rt] = registers[instr.rs] ^ +instr.imm;
+        },
+        fields: ["rt", "rs", "imm"],
+        types: ["Register", "Register", "UImm16"]
     }],
-    ["xori", (instr: Instruction): void => {
-        if (typeof instr.imm !== "number") throw new Error(`Invalid immediate ${instr.imm} for xori instruction`);
-        registers[instr.rt] = registers[instr.rs] ^ +instr.imm;
-    }],
-    ["slti", (instr: Instruction): void => {
-        if (typeof instr.imm !== "number") throw new Error(`Invalid immediate ${instr.imm} for slti instruction`);
-        registers[instr.rt] = (registers[instr.rs] < +instr.imm) ? 1 : 0;
+    ["slti", {
+        func: (instr: Instruction): void => {
+            if (typeof instr.imm !== "number") throw new Error(`Invalid immediate ${instr.imm} for slti instruction`);
+            registers[instr.rt] = (registers[instr.rs] < +instr.imm) ? 1 : 0;
+        },
+        fields: ["rt", "rs", "imm"],
+        types: ["Register", "Register", "Imm16"]
     }],
     // "lui",
     // "lb",
@@ -98,121 +175,81 @@ export const InstructionFunctions: Map<string, InstructionFunction> = new Map<st
     // "sb",
     // "sh",
     // "sw",
-    ["beq", (instr: Instruction): void => {
-        // Check a label is passed instead of an absolute address number
-        if (typeof instr.imm === "number") throw new Error(`Invalid address ${instr.imm} for beq instruction`);
-        // Verify the label is in the symtab
-        const newPC = symtab.get(instr.imm);
-        if (newPC === undefined) throw new Error(`Label ${instr.imm} not found`);
-        if (registers[instr.rs] === registers[instr.rt]){
-            changeProgramCounter(newPC);
-        }
+    ["beq", {
+        func: (instr: Instruction): void => {
+            if (registers[instr.rs] === registers[instr.rt]) {
+                registers[registerNames.indexOf("$pc")] = instr.imm;
+            }
+        },
+        fields: ["rs", "rt", "imm"],
+        types: ["Register", "Register", "Label"]
     }],
-    ["bne", (instr: Instruction): void => {
-        // Check a label is passed instead of an absolute address number
-        if (typeof instr.imm === "number") throw new Error(`Invalid address ${instr.imm} for bne instruction`);
-        // Verify the label is in the symtab
-        const newPC = symtab.get(instr.imm);
-        if (newPC === undefined) throw new Error(`Invalid label ${instr.imm}`);
-        if (registers[instr.rs] !== registers[instr.rt]){
-            changeProgramCounter(newPC);
-        }
+    ["bne", {
+        func: (instr: Instruction): void => {
+            if (registers[instr.rs] !== registers[instr.rt]) {
+                registers[registerNames.indexOf("$pc")] = instr.imm;
+            }
+        },
+        fields: ["rs", "rt", "imm"],
+        types: ["Register", "Register", "Label"]
     }],
-    ["j", (instr: Instruction): void => {
-        if (typeof instr.address === "number") throw new Error(`Invalid address ${instr.address} for j instruction`);
-        // Verify the label is in the symtab
-        const newPC = symtab.get(instr.address);
-        if (newPC === undefined) throw new Error(`Label ${instr.address} not found`);
-        changeProgramCounter(newPC);
+    ["j", {
+        func: (instr: Instruction): void => {
+            registers[registerNames.indexOf("$pc")] = instr.target;
+        },
+        fields: ["target"],
+        types: ["Label"]
     }],
-    ["jal", (instr: Instruction): void => {
-        if (typeof instr.address === "number") throw new Error(`Invalid address ${instr.address} for jal instruction`);
-        // Store the next instruction in the $ra
-        registers[registerNames.indexOf("$ra")] = $pc + 4;
-        // Verify the label is in the symtab
-        const newPC = symtab.get(instr.address);
-        if (newPC === undefined) throw new Error(`Label ${instr.imm} not found`);
-        changeProgramCounter(newPC);
+    ["jr", {
+        func: (instr: Instruction): void => {
+            registers[registerNames.indexOf("$pc")] = registers[instr.rs];
+        },
+        fields: ["rs"],
+        types: ["Register"]
+    }],
+    ["jal", {
+        func: (instr: Instruction): void => {
+            registers[registerNames.indexOf("$ra")] = registers[registerNames.indexOf("$pc")] + 4;
+            registers[registerNames.indexOf("$pc")] = instr.target;
+        },
+        fields: ["target"],
+        types: ["Label"]
     }],
     // Pseudos
-    ["li", (instr: Instruction): void => {
-        if (typeof instr.imm === "string") throw new Error(`Illegal immediate value ${instr.imm} for li instruction`)
-        registers[instr.rs] = instr.imm;
+    ["jalr", {
+        func: (instr: Instruction): void => {
+            registers[registerNames.indexOf("$ra")] = registers[registerNames.indexOf("$pc")] + 4;
+            registers[registerNames.indexOf("$pc")] = registers[instr.rs];
+        },
+        fields: ["rs"],
+        types: ["Register"]
     }],
-    ["la", (instr: Instruction): void => {
-        if (typeof instr.imm === "number") throw new Error(`Illegal immediate value ${instr.imm} for la instruction`)
-        // Verify the label is in the symtab
-        const address = symtab.get(instr.imm);
-        if (address === undefined) throw new Error(`Label ${instr.imm} not found`);
-        registers[instr.rs] = address;
+    ["li", {
+        func: (instr: Instruction): void => {
+            registers[instr.rs] = instr.imm;
+        },
+        fields: ["rs", "imm"],
+        types: ["Register", "Imm32"]
     }],
-    ["move", (instr: Instruction): void => {
-        registers[instr.rd] = registers[instr.rs];
+    ["la", {
+        func: (instr: Instruction): void => {
+            registers[instr.rs] = instr.imm;
+        },
+        fields: ["rs", "imm"],
+        types: ["Register", "Label"]
     }],
-    ["mul", (instr: Instruction): void => {
-        registers[instr.rd] = registers[instr.rs] * registers[instr.rt];
+    ["move", {
+        func: (instr: Instruction): void => {
+            registers[instr.rd] = registers[instr.rs];
+        },
+        fields: ["rd", "rs"],
+        types: ["Register", "Register"]
+    }],
+    ["mul", {
+        func: (instr: Instruction): void => {
+            registers[instr.rd] = registers[instr.rs] * registers[instr.rt];
+        },
+        fields: ["rd", "rs", "rt"],
+        types: ["Register", "Register", "Register"]
     }]
-]);
-
-export type Operand = keyof Omit<Instruction, "name">;
-
-export type OperandType = 
-    REG = ; |
-    ...
-
-export const InstructionOperands: Map<string, Operand[]> = new Map([
-
-
-
-
-
-
-    // TODO:  ADD ACTUAL OPERAND TYPES   
-        .......................
-        [][][][][]]
-
-
-
-
-
-    ["add", ["rd", "rs", "rt"]],
-    ["sub", ["rd", "rs", "rt"]],
-    ["and", ["rd", "rs", "rt"]],
-    ["or", ["rd", "rs", "rt"]],
-    ["xor", ["rd", "rs", "rt"]],
-    ["nor", ["rd", "rs", "rt"]],
-    ["slt", ["rd", "rs", "rt"]],
-    ["sll", ["rd", "rt", "shamt"]],
-    ["srl", ["rd", "rt", "shamt"]],
-    ["sra", ["rd", "rt", "shamt"]],
-    ["sllv", ["rd", "rt", "rs"]],
-    ["srlv", ["rd", "rt", "rs"]],
-    ["srav", ["rd", "rt", "rs"]],
-    ["mult", ["rs", "rt"]],
-    ["div", ["rs", "rt"]],
-    ["mfhi", ["rd"]],
-    ["mflo", ["rd"]],
-    ["jr", ["rs"]],
-    ["jalr", ["rs"]],
-    ["addi", ["rt", "rs", "imm"]],
-    ["andi", ["rt", "rs", "imm"]],
-    ["ori", ["rt", "rs", "imm"]],
-    ["xori", ["rt", "rs", "imm"]],
-    ["slti", ["rt", "rs", "imm"]],
-    ["lui", ["rt", "imm"]],
-    ["lb", ["rt", "imm", "rs"]],
-    ["lh", ["rt", "imm", "rs"]],
-    ["lw", ["rt", "imm", "rs"]],
-    ["sb", ["rt", "imm", "rs"]],
-    ["sh", ["rt", "imm", "rs"]],
-    ["sw", ["rt", "imm", "rs"]],
-    ["beq", ["rs", "rt", "imm"]],
-    ["bne", ["rs", "rt", "imm"]],
-    ["j", ["address"]],
-    ["jal", ["address"]],
-    // pseudos
-    ["li", ["rs", "imm"]],
-    ["la", ["rs", "imm"]],
-    ["move", ["rd", "rs"]],
-    ["mul", ["rd", "rs", "rt"]]
 ]);
