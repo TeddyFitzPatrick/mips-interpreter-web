@@ -1,4 +1,4 @@
-import { registers, registerNames, DataMemory } from "./interpreter.ts";
+import { registers, registerNames } from "./interpreter.ts";
 
 export type Instruction = {
   name: string,    // corresponds to opcode      (6-bits)

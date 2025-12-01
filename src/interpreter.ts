@@ -42,7 +42,6 @@ export const registerNames: string[] = [
 ];
 export const registers: Int32Array = new Int32Array(registerNames.length);
 
-
 // Data Memory 
 export let DataMemory: Int8Array = new Int8Array(DATA_MEM_SIZE);
 
@@ -254,6 +253,7 @@ export const resetProgram = (): void => {
   registers.forEach((_value, index) => {
     registers[index] = 0;
   });
+  updateRegisterDisplay();
   // reset symbol table
   symtab = new Map<string, number>();
   // reset instruction memory
