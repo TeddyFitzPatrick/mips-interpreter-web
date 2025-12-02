@@ -130,31 +130,27 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
     }],
     ["addi", {
         func: (instr: Instruction): void => {
-            if (typeof instr.imm !== "number") throw new Error(`Invalid immediate ${instr.imm} for addi instruction`);
-            registers[instr.rt] = registers[instr.rs] + +instr.imm;
+            registers[instr.rt] = registers[instr.rs] + instr.imm;
         },
         fields: ["rt", "rs", "imm"],
         types: ["Register", "Register", "Imm16"]
     }],
     ["andi", {
         func: (instr: Instruction): void => {
-            if (typeof instr.imm !== "number") throw new Error(`Invalid immediate ${instr.imm} for andi instruction`);
-            registers[instr.rt] = registers[instr.rs] & +instr.imm;
+            registers[instr.rt] = registers[instr.rs] & instr.imm;
         },
         fields: ["rt", "rs", "imm"],
         types: ["Register", "Register", "UImm16"]
     }],
     ["ori", {
         func: (instr: Instruction): void => {
-            if (typeof instr.imm !== "number") throw new Error(`Invalid immediate ${instr.imm} for ori instruction`);
-            registers[instr.rt] = registers[instr.rs] | +instr.imm;
+            registers[instr.rt] = registers[instr.rs] | instr.imm;
         },
         fields: ["rt", "rs", "imm"],
         types: ["Register", "Register", "UImm16"]
     }],
     ["xori", {
         func: (instr: Instruction): void => {
-            if (typeof instr.imm !== "number") throw new Error(`Invalid immediate ${instr.imm} for xori instruction`);
             registers[instr.rt] = registers[instr.rs] ^ +instr.imm;
         },
         fields: ["rt", "rs", "imm"],
@@ -162,8 +158,7 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
     }],
     ["slti", {
         func: (instr: Instruction): void => {
-            if (typeof instr.imm !== "number") throw new Error(`Invalid immediate ${instr.imm} for slti instruction`);
-            registers[instr.rt] = (registers[instr.rs] < +instr.imm) ? 1 : 0;
+            registers[instr.rt] = (registers[instr.rs] < instr.imm) ? 1 : 0;
         },
         fields: ["rt", "rs", "imm"],
         types: ["Register", "Register", "Imm16"]
