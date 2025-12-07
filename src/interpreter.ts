@@ -40,10 +40,10 @@ export const registerNames: string[] = [
   "$hi",
   "$lo"
 ];
-export const registers: Int32Array = new Int32Array(registerNames.length);
+export const registers: Uint32Array = new Uint32Array(registerNames.length);
 
 // Data Memory 
-export let DataMemory: Int8Array = new Int8Array(DATA_MEM_SIZE);
+export let DataMemory: Uint8Array = new Uint8Array(DATA_MEM_SIZE);
 
 // Symbol table
 let symtab: Map<string, number> = new Map<string, number>();
@@ -259,7 +259,7 @@ export const resetProgram = (): void => {
   // reset instruction memory
   InstructionMemory = [];
   // reset data memory 
-  DataMemory = new Int8Array(DATA_MEM_SIZE);
+  DataMemory = new Uint8Array(DATA_MEM_SIZE);
   // reset error output
   const errorOutput: HTMLElement | null = document.getElementById("errorOutput");
   if (errorOutput === null) return;

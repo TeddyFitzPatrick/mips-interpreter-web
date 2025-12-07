@@ -9,4 +9,8 @@ export default defineConfig({
     tailwindcss(),
     react()
   ],
+  build: {
+    outDir: "docs",    // docs is the build output folder
+    emptyOutDir: true  // clears prior docs contents
+  }
 })
