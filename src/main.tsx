@@ -29,11 +29,22 @@ done:
 
 function Editor(){
   const editorRef = useRef<HTMLDivElement | null>(null);
+  const savedCode = localStorage.getItem("storedCode");
+  const editorCode = savedCode ?? defaultCode;
   useEffect(() => {
     if (!editorRef.current) return;
     textEditor = new EditorView({
-      doc: defaultCode,
-      extensions: [keymap.of(defaultKeymap), lineNumbers(), gutter({class: "cm-mygutter"})],
+      doc: editorCode,
+      extensions: [
+        keymap.of(defaultKeymap),
+        lineNumbers(),
+        gutter({class: "cm-mygutter"}),
+        EditorView.updateListener.of((update) => {
+          if (update.docChanged){
+            localStorage.setItem("storedCode", update.state.doc.toString());
+          }
+        })
+      ],
       parent: editorRef.current
     });
   });
@@ -76,7 +87,7 @@ function RegisterView(){
 
       {/* register values */}
       <ul className="w-full h-fit flex flex-col md:flex-row flex-wrap justify-between space-y-2">
-        {Array.from(registers).map((_value, index) => (
+        {Array.from(registers.slice(0,32)).map((_value, index) => (
           <li key={index} className="w-full md:w-[49%] h-fit bg-color2 rounded-xl p-1 flex flex-row items-center justify-center space-x-4">
             {/* e.g. $t0 */}
             <h1 className="font-extrabold text-[100%]">{registerNames[index]}:</h1>
