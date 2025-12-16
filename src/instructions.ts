@@ -99,17 +99,20 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
     // "srav",
     ["mult", {
         func: (instr: Instruction): void => {
-            const product = BigInt((registers[instr.rs] << 0) | 0) * BigInt((registers[instr.rt] << 0) | 0);
-            registers[registerNames.indexOf("$hi")] = Number(product & BigInt(0xFFFFFFFF));
-            registers[registerNames.indexOf("$lo")] = Number((product >> BigInt(32)) & BigInt(0xFFFFFFFF));
+            // produce a temporary 64-bit product 
+            const product = BigInt(registers[instr.rs]) * BigInt(registers[instr.rt]);
+            // store the upper 32-bits of the product in $hi
+            registers[registerNames.indexOf("$hi")] = Number((product >> BigInt(32)) & BigInt(0xFFFFFFFF));
+            // store the lower 32-bits of the product in $lo
+            registers[registerNames.indexOf("$lo")] = Number(product & BigInt(0xFFFFFFFF));
         },
         fields: ["rs", "rt"],
         types: ["Register", "Register"]
     }],
     ["div", {
         func: (instr: Instruction): void => {
-            registers[registerNames.indexOf("$lo")] = registers[instr.rs] / registers[instr.rt];
-            registers[registerNames.indexOf("$hi")] = registers[instr.rs] % registers[instr.rt];
+            registers[registerNames.indexOf("$lo")] = (registers[instr.rs] / registers[instr.rt]) | 0;
+            registers[registerNames.indexOf("$hi")] = (registers[instr.rs] % registers[instr.rt]) | 0;
         },
         fields: ["rs", "rt"],
         types: ["Register", "Register"]
