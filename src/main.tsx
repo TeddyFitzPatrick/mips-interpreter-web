@@ -8,24 +8,28 @@ let textEditor: EditorView;
 
 export let numberFormat: number = 10; // DEFAULT = Decimal
 
-const defaultCode = `start:
-  li    $a0, 5
-  jal   fac       # calculate 5! -> 120
-  move  $s0, $v0
-  j     done
-fac:
-  li    $v0, 1
-  # 0! = 1! = 1 base case
-  beq   $a0, $v0, fac_done
-  beq   $a0, $zero, fac_done
-fac_loop:
-  mul   $v0, $v0, $a0
-  addi  $a0, $a0, -1
-  bne   $a0, $zero, fac_loop
-fac_done: 
-  jr    $ra
-done:
-  # $s0 will store 5! = 120`;
+const defaultCode = `
+li $s0, 0
+li $s1, 1
+li $s2, 2
+addi $sp, $sp, -4
+sw $s0, 0($sp)
+addi $sp, $sp, -4
+sw $s1, 0($sp)
+addi $sp, $sp, -4
+sw $s2, 0($sp)
+
+li $s0, 999
+li $s1, 999
+li $s2, 999
+
+lw $s2, 0($sp)
+addi $sp, $sp, 4
+lw $s1, 0($sp)
+addi $sp, $sp, 4
+lw $s0, 0($sp)
+addi $sp, $sp, 4
+`;
 
 function Editor(){
   const editorRef = useRef<HTMLDivElement | null>(null);
@@ -47,7 +51,7 @@ function Editor(){
       ],
       parent: editorRef.current
     });
-  });
+  }, []);
   return <div ref={editorRef} className="flex w-full h-1/2"></div>;
 }
 
@@ -59,17 +63,26 @@ function Button({name, func}: {name: string, func: () => void}){
 
 function Buttons(){
   return <div className="w-full h-fit py-4 space-x-4 space-y-2 sm:space-y-0">
-    <Button name="run" func={() => {runProgram(textEditor.state.doc.toString())}}/>
+    <Button name="run" func={() => {
+      runProgram(textEditor.state.doc.toString())
+    }}/>
     {/* <Button name="step" func={() => {return;}}/> */}
-    <Button name="reset" func={() => {resetProgram()}}/>
+    <Button name="reset" func={() => {
+      resetProgram()
+      updateRegisterDisplay(numberFormat);
+    }}/>
   </div>
 }
 
 function RegisterView(){
   const changeNumberFormat = (event: React.ChangeEvent<HTMLSelectElement>): void => {
     numberFormat = Number.parseInt(event.target.value);
-    updateRegisterDisplay();
+    updateRegisterDisplay(numberFormat);
   };
+
+  useEffect(()=>{
+    updateRegisterDisplay(numberFormat);
+  }, []);
 
   return (
     <div className="w-full sm:w-1/2 h-full flex bg-color3 p-4 rounded-xl shadow-xl flex-col">
@@ -77,9 +90,8 @@ function RegisterView(){
       <div className="bg-color2 shadow-xl rounded-xl my-4 w-full p-4 flex-col lg:flex-row flex items-center justify-center space-x-4">
         <h1 className="text-2xl h-full text-center justify-center font-bold it flex">Number System:</h1>
         <select defaultValue={numberFormat} onChange={changeNumberFormat}
-          className="text-xl  rounded-xl shadow-xl ml-2 px-4 py-2 bg-color1">
+          className="text-lg text-base rounded-xl shadow-xl ml-2 px-4 py-2 bg-color1">
           <option value={2}>Binary</option>
-          <option value={8}>Octal</option>
           <option value={10}>Decimal</option>
           <option value={16} >Hexadecimal</option>
         </select>
@@ -92,8 +104,11 @@ function RegisterView(){
             {/* e.g. $t0 */}
             <h1 className="font-extrabold text-[100%]">{registerNames[index]}:</h1>
             {/* e.g. 00000000 */}
-            <div id={"reg" + index.toString()}  className="bg-white text-[100%] rounded-xl py-1 px-2 shadow-xl font-extrabold truncate">
-              ...
+            <div id={"reg" + index.toString()}  className={
+              index === 0 
+              ?  "text-[100%] font-bold py-1"
+              : "bg-white text-[100%] rounded-xl py-1 px-2 shadow-xl font-bold truncate"
+            }>
             </div>
           </li>
         ))}

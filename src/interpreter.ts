@@ -1,4 +1,3 @@
-import { numberFormat } from "./main.tsx";
 import {type Instruction, InstructionSpec} from "./instructions.ts";
 const DATA_MEM_SIZE = 8_000_000; // (~8 MB)
 
@@ -231,8 +230,6 @@ export const runProgram = (programText: string): void => {
     // finish executing
     console.log("successful program execution");
     console.log(registers);
-    // write the final register contents to the UI
-    updateRegisterDisplay();
   } catch (error: unknown){
     console.log("failed program execution")
     resetProgram();
@@ -253,7 +250,6 @@ export const resetProgram = (): void => {
   registers.forEach((_value, index) => {
     registers[index] = 0;
   });
-  updateRegisterDisplay();
   // reset symbol table
   symtab = new Map<string, number>();
   // reset instruction memory
@@ -266,15 +262,21 @@ export const resetProgram = (): void => {
   errorOutput.textContent = "";
 }
 
-export const getRegisterOutput = (register: number): string => {
-  return registers[register].toString(numberFormat).toUpperCase();
+export const getRegisterOutput = (register: number, numberFormat: number): string => {
+  console.log(numberFormat)
+  let registerPrefix = '';
+  if (numberFormat === 2){
+    registerPrefix = '0b';
+  } else if (numberFormat === 16){
+    registerPrefix = '0x';
+  }
+  return registerPrefix + registers[register].toString(numberFormat).toUpperCase();
 }
 
-export const updateRegisterDisplay = (): void => {
+export const updateRegisterDisplay = (numberFormat: number): void => {
   for (let index = 0; index < 32; index++){
     const registerElement = document.getElementById(`reg${index}`);
-    if (!registerElement) continue;
-    registerElement.textContent = getRegisterOutput(index);
+    registerElement!.textContent = getRegisterOutput(index, numberFormat);
   }
 }
 
