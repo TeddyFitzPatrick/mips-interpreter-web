@@ -1,4 +1,4 @@
-import { registers, registerNames } from "./interpreter.ts";
+import { registers, registerNames, DataMemory } from "./interpreter.ts";
 
 export type Instruction = {
   name: string,    // corresponds to opcode      (6-bits)
@@ -10,16 +10,25 @@ export type Instruction = {
   target: number   // the 26-bit J-type addr     (26-bits)
 }
 
+export const MemoryInstructions: string[] = [
+    "lb",
+    "lh",
+    "lw",
+    "sb",
+    "sh",
+    "sw"
+]
+
 export type Operand = keyof Omit<Instruction, "name">;
 
 export type OperandType = 
-    "Register" |
-    "UImm16" |
-    "Imm16" |
-    "UImm32" |
-    "Imm32" |
-    "ShiftAmount" |
-    "Label";
+    | "Register" 
+    | "UImm16" 
+    | "Imm16" 
+    | "UImm32" 
+    | "Imm32" 
+    | "ShiftAmount" 
+    | "Label";
 
 export type InstructionFunction = (instr: Instruction) => void;
 
@@ -169,10 +178,36 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
     // "lui",
     // "lb",
     // "lh",
-    // "lw",
+    ["lw", {
+        func: (instr: Instruction): void => {            
+            const effectiveAddress = registers[instr.rs] + instr.imm;
+            registers[instr.rt] = Number(
+                  BigInt(DataMemory[effectiveAddress] << 24)
+                + BigInt(DataMemory[effectiveAddress+1] << 16)
+                + BigInt(DataMemory[effectiveAddress+2] << 8)
+                + BigInt(DataMemory[effectiveAddress+3]));
+        },
+        fields: ["rt", "imm", "rs"],
+        types: ["Register", "Imm16", "Register"]
+    }],
     // "sb",
     // "sh",
-    // "sw",
+    ["sw", {
+        func: (instr: Instruction): void => {
+            const effectiveAddress = registers[instr.rs] + instr.imm;
+            const wordValue = registers[instr.rt];
+            // bits 31-24 (most significant bits)
+            DataMemory[effectiveAddress] = Number(BigInt(wordValue) & BigInt(0xff000000)) >> 24;
+            // bits 23-16
+            DataMemory[effectiveAddress + 1] = Number(BigInt(wordValue) & BigInt(0xff0000)) >> 16;
+            // bits 15-8
+            DataMemory[effectiveAddress + 2] = Number(BigInt(wordValue) & BigInt(0xff00)) >> 8;
+            // bits 7-0 (least significant bits)
+            DataMemory[effectiveAddress + 3] = Number(BigInt(wordValue) & BigInt(0xff));
+        },
+        fields: ["rt", "imm", "rs"],
+        types: ["Register", "Imm16", "Register"]
+    }],
     ["beq", {
         func: (instr: Instruction): void => {
             if (registers[instr.rs] === registers[instr.rt]) {

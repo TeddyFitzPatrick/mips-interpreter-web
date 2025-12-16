@@ -1,5 +1,5 @@
-import {type Instruction, InstructionSpec} from "./instructions.ts";
-const DATA_MEM_SIZE = 8_000_000; // (~8 MB)
+import {type Instruction, InstructionSpec, MemoryInstructions} from "./instructions.ts";
+const DATA_MEM_SIZE = 8_000_004; // (~8 MB)
 
 // Registers
 export const registerNames: string[] = [
@@ -40,6 +40,7 @@ export const registerNames: string[] = [
   "$lo"
 ];
 export const registers: Uint32Array = new Uint32Array(registerNames.length);
+registers[registerNames.indexOf("$sp")] = DATA_MEM_SIZE - 4;
 
 // Data Memory 
 export let DataMemory: Uint8Array = new Uint8Array(DATA_MEM_SIZE);
@@ -56,16 +57,14 @@ export const parse = (programText: string): Instruction[] => {
     .split("\n")
     .map(line => {
       // Remove trailing & leading whitespace, normalize whitespace, remove comments
-      const cleanLine = line.split("#")[0].trim().replace(/\s+/g, " ")
-      // Add labels to the symble tab
-      return cleanLine
+      return line.split("#")[0].trim().replace(/\s+/g, " ")
     })
     .filter(line => line !== "") // remove empty lines after removing whitespace/comments
     .map(line => {
-      let colonIndex;
+      let colonIndex, label;
       while ((colonIndex = line.indexOf(":")) !== -1){
         // Remove leading whitespace before the label
-        let label = line.slice(0, colonIndex).replace(/^\s+/, "");
+        label = line.slice(0, colonIndex).replace(/^\s+/, "");
         // Label validation
         const validateResponse = validateLabelName(label);
         if (typeof validateResponse === "string") throw new Error (validateResponse);
@@ -78,18 +77,28 @@ export const parse = (programText: string): Instruction[] => {
       return line;
     })
     .filter(line => line !== "") // remove empty lines after removing labels
-  // If after removing whitespace, comments, and labels, there are no instructions
-  if (programLines.length === 0) return [];
   // Convert each line into an instruction
   return programLines.map(line => {
     // Separate each line into an instruction name and its arguments ("addi" + "$t0, $t0, 1")
     const firstSpaceIndex = line.indexOf(" ");
-    if (firstSpaceIndex === -1) throw new Error(`Invalid line "${line}", missing a space`)
+    if (firstSpaceIndex === -1) throw new Error(`Invalid syntax, instruction is missing a space`)
     const instructionName = line.slice(0, firstSpaceIndex).toLowerCase();
-    const lineArguments = line.slice(firstSpaceIndex).replace(/\s+/g, "").split(",").filter(arg => arg !== "");
     // Get the instruction's operands (e.g. addi => ["rs", "rt", "imm"])
     const instructionSpec = InstructionSpec.get(instructionName);
+    let lineArguments = line.slice(firstSpaceIndex).replace(/\s+/g, "").split(",").filter(arg => arg !== "");
     if (instructionSpec === undefined) throw new Error(`Instruction ${instructionName} not found`);
+    // Handle the special syntax of memory instructions i.e. rt, imm(rs) 
+    if (MemoryInstructions.indexOf(instructionName) !== -1){
+      if (lineArguments.length !== 2) throw new Error(`Invalid argument count for ${instructionName} instruction`)
+      const displacementArg = lineArguments.pop();
+      if (displacementArg === undefined) throw new Error(`Invalid syntax for ${instructionName} instruction`);
+      const openParenIndex = displacementArg.indexOf("(");
+      if (openParenIndex === -1 || displacementArg.slice(-1) !== ")") throw new Error(`Invalid syntax for ${instructionName} instruction`);
+      // Push the offset immediate
+      lineArguments.push(displacementArg.slice(0, openParenIndex));
+      // Push the rs argument
+      lineArguments.push(displacementArg.slice(openParenIndex + 1, displacementArg.length - 1));
+    }
     const operandFields = instructionSpec.fields;
     const operandTypes = instructionSpec.types;
     // Generate the line's corresponding instruction
@@ -199,39 +208,30 @@ const validateLabelName = (label: string): boolean | string => {
 }
 
 export const runProgram = (programText: string): void => {
-  resetProgram(); // clear any previous runs
+  // set $pc to 0
+  registers[registerNames.indexOf("$pc")] = 0;
   const errorOutput: HTMLElement | null = document.getElementById("errorOutput");
-  if (errorOutput === null) return;
+  if (errorOutput === null) throw new Error('Could not find the error output!')
   try{
     // parse the program text into a list of instructions
     InstructionMemory = parse(programText);
-    console.log("Instructions:",InstructionMemory);
-    console.log("Symtab:",symtab);
     // execute the program instructions
-    let counter = 0;
     let instructionIndex: number;
     while ((instructionIndex = registers[registerNames.indexOf("$pc")] / 4) < InstructionMemory.length){
-      console.log("index::",instructionIndex);
       const instr = InstructionMemory[instructionIndex];
-      console.log(instr.name);
       // retrieve the function's execution function (e.g. add => {rd = rs + rt})
       const instructionFunction = InstructionSpec.get(instr.name)!.func;
       // run the function with operands
       instructionFunction(instr);
-      // $zero can not change value
+      // do not allow $zero to change value
       registers[0] = 0;
       // increment the program counter if the instruction didn't change it
       if (instructionIndex === registers[registerNames.indexOf("$pc")] / 4){
         registers[registerNames.indexOf("$pc")] += 4; 
       }
-      counter++;
-      if (counter > 100) break;
     };
-    // finish executing
-    console.log("successful program execution");
-    console.log(registers);
   } catch (error: unknown){
-    console.log("failed program execution")
+    console.log("error detected");
     resetProgram();
     // Parsing or program execution failure
     if (error instanceof Error){
@@ -248,7 +248,7 @@ export const runProgram = (programText: string): void => {
 export const resetProgram = (): void => {
   // reset registers to 0
   registers.forEach((_value, index) => {
-    registers[index] = 0;
+    registers[index] = (index === registerNames.indexOf("$sp")) ? DATA_MEM_SIZE - 4 : 0;
   });
   // reset symbol table
   symtab = new Map<string, number>();
@@ -263,7 +263,6 @@ export const resetProgram = (): void => {
 }
 
 export const getRegisterOutput = (register: number, numberFormat: number): string => {
-  console.log(numberFormat)
   let registerPrefix = '';
   if (numberFormat === 2){
     registerPrefix = '0b';

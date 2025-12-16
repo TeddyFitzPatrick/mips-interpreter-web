@@ -12,6 +12,7 @@ const defaultCode = `
 li $s0, 0
 li $s1, 1
 li $s2, 2
+
 addi $sp, $sp, -4
 sw $s0, 0($sp)
 addi $sp, $sp, -4
@@ -64,7 +65,8 @@ function Button({name, func}: {name: string, func: () => void}){
 function Buttons(){
   return <div className="w-full h-fit py-4 space-x-4 space-y-2 sm:space-y-0">
     <Button name="run" func={() => {
-      runProgram(textEditor.state.doc.toString())
+      runProgram(textEditor.state.doc.toString());
+      updateRegisterDisplay(numberFormat);
     }}/>
     {/* <Button name="step" func={() => {return;}}/> */}
     <Button name="reset" func={() => {
@@ -85,12 +87,12 @@ function RegisterView(){
   }, []);
 
   return (
-    <div className="w-full sm:w-1/2 h-full flex bg-color3 p-4 rounded-xl shadow-xl flex-col">
+    <div className="w-full h-full flex bg-color3 p-4 rounded-xl shadow-xl flex-col">
       {/* register data format (default hex) */}
       <div className="bg-color2 shadow-xl rounded-xl my-4 w-full p-4 flex-col lg:flex-row flex items-center justify-center space-x-4">
         <h1 className="text-2xl h-full text-center justify-center font-bold it flex">Number System:</h1>
         <select defaultValue={numberFormat} onChange={changeNumberFormat}
-          className="text-lg text-base rounded-xl shadow-xl ml-2 px-4 py-2 bg-color1">
+          className="text-lg rounded-xl shadow-xl ml-2 px-4 py-2 bg-color1">
           <option value={2}>Binary</option>
           <option value={10}>Decimal</option>
           <option value={16} >Hexadecimal</option>
@@ -100,14 +102,14 @@ function RegisterView(){
       {/* register values */}
       <ul className="w-full h-fit flex flex-col md:flex-row flex-wrap justify-between space-y-2">
         {Array.from(registers.slice(0,32)).map((_value, index) => (
-          <li key={index} className="w-full md:w-[49%] h-fit bg-color2 rounded-xl p-1 flex flex-row items-center justify-center space-x-4">
+          <li key={index} className="w-full md:w-[49%] 2xl:w-[24.5%] h-fit bg-color2 rounded-xl flex flex-row items-center justify-center space-x-4">
             {/* e.g. $t0 */}
             <h1 className="font-extrabold text-[100%]">{registerNames[index]}:</h1>
             {/* e.g. 00000000 */}
             <div id={"reg" + index.toString()}  className={
               index === 0 
-              ?  "text-[100%] font-bold py-1"
-              : "bg-white text-[100%] rounded-xl py-1 px-2 shadow-xl font-bold truncate"
+              ?  "text-[100%] font-bold py-1" 
+              : "bg-white text-[100%] rounded-xl py-1 px-2 shadow-xl font-bold"
             }>
             </div>
           </li>
@@ -115,6 +117,13 @@ function RegisterView(){
       </ul>
     </div>
   );
+}
+
+function MemoryView(){
+
+  return <div className=" bg-color3">
+    memory!!
+  </div>
 }
 
 const root = document.getElementById("root");
@@ -135,7 +144,12 @@ if (root !== undefined && root !== null && !root.hasChildNodes()){
           <textarea id="errorOutput" className="resize-none w-full h-full text-red-500 rounded-lg p-2 text-red bg-color1 font-bold"></textarea>
         </div>
       </div>
-      <RegisterView/>
+
+      <div className="flex flex-col w-full sm:w-1/2 h-full space-y-4">
+        <RegisterView/>
+        <MemoryView/>
+      </div>
+
     </div>
   )
 }
