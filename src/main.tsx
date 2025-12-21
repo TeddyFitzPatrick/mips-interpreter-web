@@ -1,8 +1,8 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, type ChangeEvent, type ChangeEventHandler } from 'react'
 import { createRoot } from 'react-dom/client'
 import { EditorView, keymap, lineNumbers, gutter } from "@codemirror/view"
 import { defaultKeymap } from "@codemirror/commands"
-import { registers, registerNames, updateRegisterDisplay, runProgram, resetProgram} from './interpreter.ts';
+import { registers, DataMemory, DATA_MEM_SIZE, registerNames, updateRegisterDisplay, runProgram, resetProgram} from './interpreter.ts';
 import './index.css'
 let textEditor: EditorView;
 
@@ -87,12 +87,12 @@ function RegisterView(){
   }, []);
 
   return (
-    <div className="w-full h-full flex bg-color3 p-4 rounded-xl shadow-xl flex-col">
+    <div className="w-full h-full flex bg-color3 p-4 space-y-4 rounded-xl shadow-xl flex-col">
       {/* register data format (default hex) */}
-      <div className="bg-color2 shadow-xl rounded-xl my-4 w-full p-4 flex-col lg:flex-row flex items-center justify-center space-x-4">
-        <h1 className="text-2xl h-full text-center justify-center font-bold it flex">Number System:</h1>
+      <div className="w-full flex-col lg:flex-row flex items-center space-x-4">
+        <h1 className="text-2xl h-full justify-center font-bold flex">Number System:</h1>
         <select defaultValue={numberFormat} onChange={changeNumberFormat}
-          className="text-lg rounded-xl shadow-xl ml-2 px-4 py-2 bg-color1">
+          className="text-lg rounded-xl shadow-xl px-4 py-2 bg-color1">
           <option value={2}>Binary</option>
           <option value={10}>Decimal</option>
           <option value={16} >Hexadecimal</option>
@@ -120,10 +120,39 @@ function RegisterView(){
 }
 
 function MemoryView(){
+  let memorySearchRef = useRef<HTMLInputElement | null>(null);
+  let memoryViewRef = useRef<HTMLDivElement | null>(null);
 
-  return <div className=" bg-color3">
-    memory!!
+  const lookupMemory = (event: ChangeEvent<HTMLInputElement>) => {
+    if (!memorySearchRef.current) return;
+    let inputAddress = +event.target.value;
+    if (!Number.isFinite(inputAddress)) return;
+    inputAddress = Math.max(0, Math.min(inputAddress, DATA_MEM_SIZE-4));
+    memorySearchRef.current.value = String(inputAddress);
+    if (!memoryViewRef.current) return;
+    // Update memory view to the 8 bytes starting at the inputted address
+    memoryViewRef.current.textContent = "";
+    for (let offset = 0; offset < 8; offset++){
+      const memoryAddress = inputAddress + offset;
+      if (memoryAddress < 0 || memoryAddress > DATA_MEM_SIZE) break;
+      const memoryAtAddress: number = DataMemory[inputAddress + offset];
+      memoryViewRef.current.textContent += " " + memoryAtAddress.toString(16).toUpperCase().padStart(2, "0");
+    }
+  };
+
+  return <div className="w-full h-full flex bg-color3 p-4 rounded-xl shadow-xl flex-col space-y-2">
+    <h1 className="text-xl font-bold">Memory View (addressable from 0 to 8,000,000<sub>dec</sub>)</h1>
+    <input type="text" 
+          id="memorySearch" 
+          className="bg-white rounded-xl h-8 w-fit p-5" 
+          placeholder="Memory Address"
+          ref={memorySearchRef}
+          onChange={lookupMemory}>
+    </input>
+    <div id="memoryView" className="font-bold" ref={memoryViewRef}>
+    </div>
   </div>
+
 }
 
 const root = document.getElementById("root");

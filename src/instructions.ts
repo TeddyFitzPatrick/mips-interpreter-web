@@ -1,4 +1,4 @@
-import { registers, registerNames, DataMemory } from "./interpreter.ts";
+import { registers, registerNames, DataMemory, DATA_MEM_SIZE } from "./interpreter.ts";
 
 export type Instruction = {
   name: string,    // corresponds to opcode      (6-bits)
@@ -181,6 +181,7 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
     ["lw", {
         func: (instr: Instruction): void => {            
             const effectiveAddress = registers[instr.rs] + instr.imm;
+            validateAddress(effectiveAddress);
             registers[instr.rt] = Number(
                   BigInt(DataMemory[effectiveAddress] << 24)
                 + BigInt(DataMemory[effectiveAddress+1] << 16)
@@ -195,6 +196,7 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
     ["sw", {
         func: (instr: Instruction): void => {
             const effectiveAddress = registers[instr.rs] + instr.imm;
+            validateAddress(effectiveAddress);
             const wordValue = registers[instr.rt];
             // bits 31-24 (most significant bits)
             DataMemory[effectiveAddress] = Number(BigInt(wordValue) & BigInt(0xff000000)) >> 24;
@@ -286,3 +288,8 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
         types: ["Register", "Register", "Register"]
     }]
 ]);
+
+
+const validateAddress = (address: number): void => {
+    if (address < 0 || address > DATA_MEM_SIZE-4) throw new Error("Segmentation fault");
+}

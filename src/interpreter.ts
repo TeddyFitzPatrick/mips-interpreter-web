@@ -1,5 +1,5 @@
 import {type Instruction, InstructionSpec, MemoryInstructions} from "./instructions.ts";
-const DATA_MEM_SIZE = 8_000_004; // (~8 MB)
+export const DATA_MEM_SIZE = 8_000_004; // (~8 MB)
 
 // Registers
 export const registerNames: string[] = [
@@ -210,8 +210,10 @@ const validateLabelName = (label: string): boolean | string => {
 export const runProgram = (programText: string): void => {
   // set $pc to 0
   registers[registerNames.indexOf("$pc")] = 0;
+  // clear the error output
   const errorOutput: HTMLElement | null = document.getElementById("errorOutput");
-  if (errorOutput === null) throw new Error('Could not find the error output!')
+  if (errorOutput === null) throw new Error('Could not find the error output!');
+  errorOutput.textContent = "";
   try{
     // parse the program text into a list of instructions
     InstructionMemory = parse(programText);
