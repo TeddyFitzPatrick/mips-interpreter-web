@@ -102,10 +102,30 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
         fields: ["rd", "rt", "shamt"],
         types: ["Register", "Register", "ShiftAmount"]
     }],
-    // "sra"
-    // "sllv",
-    // "srlv",
-    // "srav",
+    // ["sra", {
+    //     func: (instr: Instruction): void => {
+    //     },
+    //     fields: [],
+    //     types: []
+    // }],
+    // ["sllv", {
+    //     func: (instr: Instruction): void => {
+    //     },
+    //     fields: [],
+    //     types: []
+    // }],
+    // ["srlv", {
+    //     func: (instr: Instruction): void => {
+    //     },
+    //     fields: [],
+    //     types: []
+    // }],
+    // ["srav", {
+    //     func: (instr: Instruction): void => {
+    //     },
+    //     fields: [],
+    //     types: []
+    // }],
     ["mult", {
         func: (instr: Instruction): void => {
             // produce a temporary 64-bit product 
@@ -175,9 +195,29 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
         fields: ["rt", "rs", "imm"],
         types: ["Register", "Register", "Imm16"]
     }],
-    // "lui",
-    // "lb",
-    // "lh",
+    // ["lui", {
+    //     func: (instr: Instruction): void => {
+
+    //     },
+    //     fields: [],
+    //     types: []
+    // }],
+    // ["lb", {
+    //     func: (instr: Instruction): void => {
+
+    //     },
+    //    fields: ["rt", "imm", "rs"],
+    //    types: ["Register", "Imm16", "Register"]
+    // }],
+    // ["lh", {
+    //     func: (instr: Instruction): void => {
+    //         const effectiveAddress = registers[instr.rs] + instr.imm;
+    //         validateAddress(effectiveAddress);
+    //         // remember to add sign extension
+    //     },
+    //     fields: ["rt", "imm", "rs"],
+    //     types: ["Register", "Imm16", "Register"]
+    // }],
     ["lw", {
         func: (instr: Instruction): void => {            
             const effectiveAddress = registers[instr.rs] + instr.imm;
@@ -191,8 +231,20 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
         fields: ["rt", "imm", "rs"],
         types: ["Register", "Imm16", "Register"]
     }],
-    // "sb",
-    // "sh",
+    // ["sb", {
+    //     func: (instr: Instruction): void => {
+
+    //     },
+    //     fields: [],
+    //     types: []
+    // }],
+    // ["sh", {
+    //     func: (instr: Instruction): void => {
+
+    //     },
+    //     fields: [],
+    //     types: []
+    // }],
     ["sw", {
         func: (instr: Instruction): void => {
             const effectiveAddress = registers[instr.rs] + instr.imm;
@@ -291,5 +343,5 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
 
 
 const validateAddress = (address: number): void => {
-    if (address < 0 || address > DATA_MEM_SIZE-4) throw new Error("Segmentation fault");
+    if (address < 0 || address > DATA_MEM_SIZE - 4) throw new Error("Segmentation fault");
 }

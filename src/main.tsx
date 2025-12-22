@@ -1,12 +1,13 @@
-import { useEffect, useRef, type ChangeEvent, type ChangeEventHandler } from 'react'
+import { useEffect, useRef, type ChangeEvent} from 'react'
 import { createRoot } from 'react-dom/client'
 import { EditorView, keymap, lineNumbers, gutter } from "@codemirror/view"
 import { defaultKeymap } from "@codemirror/commands"
-import { registers, DataMemory, DATA_MEM_SIZE, registerNames, updateRegisterDisplay, runProgram, resetProgram} from './interpreter.ts';
+import { registers, registerNames, updateMemoryViewAddress, updateMemoryView, updateRegisterDisplay, runProgram, resetProgram} from './interpreter.ts';
 import './index.css'
-let textEditor: EditorView;
 
 export let numberFormat: number = 10; // DEFAULT = Decimal
+
+let textEditor: EditorView;
 
 const defaultCode = `
 li $s0, 0
@@ -67,11 +68,13 @@ function Buttons(){
     <Button name="run" func={() => {
       runProgram(textEditor.state.doc.toString());
       updateRegisterDisplay(numberFormat);
+      updateMemoryView();
     }}/>
     {/* <Button name="step" func={() => {return;}}/> */}
     <Button name="reset" func={() => {
       resetProgram()
       updateRegisterDisplay(numberFormat);
+      updateMemoryView();
     }}/>
   </div>
 }
@@ -125,19 +128,10 @@ function MemoryView(){
 
   const lookupMemory = (event: ChangeEvent<HTMLInputElement>) => {
     if (!memorySearchRef.current) return;
-    let inputAddress = +event.target.value;
-    if (!Number.isFinite(inputAddress)) return;
-    inputAddress = Math.max(0, Math.min(inputAddress, DATA_MEM_SIZE-4));
-    memorySearchRef.current.value = String(inputAddress);
-    if (!memoryViewRef.current) return;
-    // Update memory view to the 8 bytes starting at the inputted address
-    memoryViewRef.current.textContent = "";
-    for (let offset = 0; offset < 8; offset++){
-      const memoryAddress = inputAddress + offset;
-      if (memoryAddress < 0 || memoryAddress > DATA_MEM_SIZE) break;
-      const memoryAtAddress: number = DataMemory[inputAddress + offset];
-      memoryViewRef.current.textContent += " " + memoryAtAddress.toString(16).toUpperCase().padStart(2, "0");
-    }
+    const validatedAddress: string | boolean = updateMemoryViewAddress(event.target.value)
+    if (!validatedAddress) return;
+    memorySearchRef.current.value = validatedAddress;
+    updateMemoryView();
   };
 
   return <div className="w-full h-full flex bg-color3 p-4 rounded-xl shadow-xl flex-col space-y-2">
@@ -145,14 +139,13 @@ function MemoryView(){
     <input type="text" 
           id="memorySearch" 
           className="bg-white rounded-xl h-8 w-fit p-5" 
-          placeholder="Memory Address"
+          placeholder={"8000000"}
           ref={memorySearchRef}
           onChange={lookupMemory}>
     </input>
-    <div id="memoryView" className="font-bold" ref={memoryViewRef}>
+    <div id="memoryView" className="font-bold text-xl" ref={memoryViewRef}>
     </div>
   </div>
-
 }
 
 const root = document.getElementById("root");
@@ -170,7 +163,7 @@ if (root !== undefined && root !== null && !root.hasChildNodes()){
           <h1 className="font-bold text-xl">
             Error Output
           </h1>
-          <textarea id="errorOutput" className="resize-none w-full h-full text-red-500 rounded-lg p-2 text-red bg-color1 font-bold"></textarea>
+          <textarea id="errorOutput" disabled className="resize-none w-full h-full text-red-500 rounded-lg p-2 text-red bg-color1 font-bold"></textarea>
         </div>
       </div>
 

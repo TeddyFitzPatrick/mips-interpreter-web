@@ -1,5 +1,7 @@
-import {type Instruction, InstructionSpec, MemoryInstructions} from "./instructions.ts";
+import { type Instruction, InstructionSpec, MemoryInstructions } from "./instructions.ts";
 export const DATA_MEM_SIZE = 8_000_004; // (~8 MB)
+const MAX_ADDRESSABLE = 8_000_000;
+export let memoryViewAddress: number = 8_000_000;
 
 // Registers
 export const registerNames: string[] = [
@@ -40,7 +42,7 @@ export const registerNames: string[] = [
   "$lo"
 ];
 export const registers: Uint32Array = new Uint32Array(registerNames.length);
-registers[registerNames.indexOf("$sp")] = DATA_MEM_SIZE - 4;
+registers[registerNames.indexOf("$sp")] = MAX_ADDRESSABLE;
 
 // Data Memory 
 export let DataMemory: Uint8Array = new Uint8Array(DATA_MEM_SIZE);
@@ -183,10 +185,16 @@ const isShiftAmount = (text: string): boolean => {
   return 0 <= +text && +text <= Math.pow(2,5) - 1;
 }
 
+/**
+ * Returns true if a label (string) is found in the symbol table 
+ */
 const isLabel = (text: string): boolean => {
   return symtab.has(text);
 }
 
+/**
+ * Returns true if a string represents a finite number 
+ */
 const isNumeric = (numberRepresentation: string): boolean => {
   return numberRepresentation.trim() !== "" && Number.isFinite(+numberRepresentation);
 }
@@ -250,7 +258,7 @@ export const runProgram = (programText: string): void => {
 export const resetProgram = (): void => {
   // reset registers to 0
   registers.forEach((_value, index) => {
-    registers[index] = (index === registerNames.indexOf("$sp")) ? DATA_MEM_SIZE - 4 : 0;
+    registers[index] = (index === registerNames.indexOf("$sp")) ? MAX_ADDRESSABLE : 0;
   });
   // reset symbol table
   symtab = new Map<string, number>();
@@ -281,3 +289,24 @@ export const updateRegisterDisplay = (numberFormat: number): void => {
   }
 }
 
+export const updateMemoryView = (): void => {
+  if (memoryViewAddress === null || memoryViewAddress === undefined) return;
+  const memoryView = document.getElementById("memoryView");
+  if (!memoryView) return;
+  // Update memory view to the 8 bytes starting at the inputted address
+  memoryView.textContent = "";
+  for (let offset = 0; offset < 8; offset++){
+    const memoryAddress = memoryViewAddress + offset;
+    // bound check
+    if (memoryAddress < 0 || memoryAddress > DATA_MEM_SIZE - 1) break;
+    const memoryByte: number = DataMemory[memoryAddress];
+    memoryView.textContent += ` ${memoryByte.toString(16).toUpperCase().padStart(2, "0")}`;
+  }
+}
+
+export const updateMemoryViewAddress = (newAddress: string): string => {
+  if (!isNumeric(newAddress)) return "";
+  newAddress = String(Math.max(0, Math.min(+newAddress, MAX_ADDRESSABLE)));
+  memoryViewAddress = +newAddress;
+  return newAddress;
+}
