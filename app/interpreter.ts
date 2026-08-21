@@ -1,4 +1,4 @@
-import { type Instruction, InstructionSpec, MemoryInstructions } from "./instructions.ts";
+import { type Instruction, InstructionSpec, MemoryInstructions } from "./instructions";
 export const DATA_MEM_SIZE = 8_000_004; // (~8 MB)
 const MAX_ADDRESSABLE = 8_000_000;
 export let memoryViewAddress: number = 8_000_000;
