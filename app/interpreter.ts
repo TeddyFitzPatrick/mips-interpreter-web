@@ -53,15 +53,19 @@ let symtab: Map<string, number> = new Map<string, number>();
 // Program instructions
 let InstructionMemory: Instruction[] = [];
 
-export const parse = (programText: string): Instruction[] => {
-  let lineNumber: number = 0;
-  const programLines = programText
-    .split("\n")
+export const minify = (programLines: string[]): string[] => {
+  return programLines
     .map(line => {
       // Remove trailing & leading whitespace, normalize whitespace, remove comments
       return line.split("#")[0].trim().replace(/\s+/g, " ")
     })
     .filter(line => line !== "") // remove empty lines after removing whitespace/comments
+}
+
+// quickParse flag turns off errors in label names: intended to get labels for autocompletions
+export const parseLabels = (programLines: string[], labelStore: Map<string, number>, quickParse = false): string[] => {
+  let lineNumber = 0;
+  const parsedProgramLines = programLines
     .map(line => {
       let colonIndex, label;
       while ((colonIndex = line.indexOf(":")) !== -1){
@@ -69,9 +73,13 @@ export const parse = (programText: string): Instruction[] => {
         label = line.slice(0, colonIndex).replace(/^\s+/, "");
         // Label validation
         const validateResponse = validateLabelName(label);
-        if (typeof validateResponse === "string") throw new Error (validateResponse);
-        // Add the label to the symtab
-        symtab.set(label, lineNumber * 4);
+        if (typeof validateResponse === "string"){
+          if (!quickParse) throw new Error (validateResponse);
+        }
+        else {
+          // Add the label to the symtab
+          labelStore.set(label, lineNumber * 4);
+        }
         // Cut the label out of the line and repeat for other labels
         line = line.slice(colonIndex + 1).trim();
       }
@@ -79,140 +87,78 @@ export const parse = (programText: string): Instruction[] => {
       return line;
     })
     .filter(line => line !== "") // remove empty lines after removing labels
-  // Convert each line into an instruction
-  return programLines.map(line => {
-    // Separate each line into an instruction name and its arguments ("addi" + "$t0, $t0, 1")
-    const firstSpaceIndex = line.indexOf(" ");
-    if (firstSpaceIndex === -1) throw new Error(`Invalid syntax, instruction is missing a space`)
-    const instructionName = line.slice(0, firstSpaceIndex).toLowerCase();
-    // Get the instruction's operands (e.g. addi => ["rs", "rt", "imm"])
-    const instructionSpec = InstructionSpec.get(instructionName);
-    let lineArguments = line.slice(firstSpaceIndex).replace(/\s+/g, "").split(",").filter(arg => arg !== "");
-    if (instructionSpec === undefined) throw new Error(`Instruction ${instructionName} not found`);
-    // Handle the special syntax of memory instructions i.e. rt, imm(rs) 
-    if (MemoryInstructions.indexOf(instructionName) !== -1){
-      if (lineArguments.length !== 2) throw new Error(`Invalid argument count for ${instructionName} instruction`)
-      const displacementArg = lineArguments.pop();
-      if (displacementArg === undefined) throw new Error(`Invalid syntax for ${instructionName} instruction`);
-      const openParenIndex = displacementArg.indexOf("(");
-      if (openParenIndex === -1 || displacementArg.slice(-1) !== ")") throw new Error(`Invalid syntax for ${instructionName} instruction`);
-      // Push the offset immediate
-      lineArguments.push(displacementArg.slice(0, openParenIndex));
-      // Push the rs argument
-      lineArguments.push(displacementArg.slice(openParenIndex + 1, displacementArg.length - 1));
-    }
-    const operandFields = instructionSpec.fields;
-    const operandTypes = instructionSpec.types;
-    // Generate the line's corresponding instruction
-    const instruction: Instruction = {
-      name: instructionName, rs: -1, rt: -1, rd: -1, shamt: -1, imm: -1, target: -1
-    }
-    // Arity mismatch
-    if (lineArguments.length !== operandFields.length){
-      throw new Error(
-        `Invalid argument count for ${instructionName} (expected ${operandFields.length}, got ${lineArguments.length})\n` +
-        `Usage: ${instructionName} ${operandFields.join(", ")}`
-      );
-    }
-    // Put the line arguments into the instruction's fields
-    for (let index = 0; index <= operandFields.length; index++){
-      const lineArgument = lineArguments[index];
-      const field = operandFields[index];
-      const operandType = operandTypes[index];
-      if (operandType === "Register") {
-        if (!isRegister(lineArgument)) throw new Error(`Invalid register argument ${lineArgument}`);
-        instruction[field] = (registerNames.includes(lineArgument)) ? registerNames.indexOf(lineArgument) : +lineArgument.slice(1);
-      } else if (operandType === "UImm16") {
-        if (!isUImm16(lineArgument)) throw new Error(`Invalid UImm16 argument ${lineArgument}`);
-        instruction[field] = +lineArgument;
-      } else if (operandType === "Imm16") {
-        if (!isImm16(lineArgument)) throw new Error(`Invalid Imm16 argument ${lineArgument}`);
-        instruction[field] = +lineArgument;
-      } else if (operandType === "UImm32") {
-        if (!isUImm32(lineArgument)) throw new Error(`Invalid UImm32 argument ${lineArgument}`);
-        instruction[field] = +lineArgument;
-      } else if (operandType === "Imm32") {
-        if (!isImm32(lineArgument)) throw new Error(`Invalid Imm32 argument ${lineArgument}`);
-        instruction[field] = +lineArgument;
-      } else if (operandType === "ShiftAmount") {
-        if (!isShiftAmount(lineArgument)) throw new Error(`Invalid ShiftAmount argument ${lineArgument}`);
-        instruction[field] = +lineArgument;
-      } else if (operandType === "Label") {
-        if (!isLabel(lineArgument)) throw new Error(`Invalid Label argument ${lineArgument}`);
-        instruction[field] = symtab.get(lineArgument)!;
-      }
-      // Add the instruction to instruction memory
-      InstructionMemory.push(instruction);
-    }
-    // Increment the line number
-    lineNumber++;
-    return instruction;
-  });
+  return parsedProgramLines;
 }
 
-const isRegister = (text: string): boolean => {
-  // Disallow user access to special-purpose registers
-  if (text === "$pc" || text === "$hi" || text === "$lo") return false;
-  // Symbolic register (e.g. $v0)
-  if (registerNames.includes(text)) return true;
-  // Numeric register (e.g. $5)
-  if (text[0] === "$" && isNumeric(text.slice(1)) && 0 <= +text.slice(1) && +text.slice(1) <= 31) return true;
-  return false
-}
-
-const isUImm16 = (text: string): boolean => {
-  if (!isNumeric(text)) return false;
-  return 0 <= +text && +text <= Math.pow(2,16) - 1;
-}
-
-const isImm16 = (text: string): boolean => {
-  if (!isNumeric(text)) return false;
-  return -Math.pow(2,15) <= +text && +text <= Math.pow(2,15) - 1;
-}
-
-const isUImm32 = (text: string): boolean => {
-  if (!isNumeric(text)) return false;
-  return 0 <= +text && +text <= Math.pow(2,32) - 1;
-}
-
-const isImm32 = (text: string): boolean => {
-  if (!isNumeric(text)) return false;
-  return -Math.pow(2,31) <= +text && +text <= Math.pow(2,31) - 1;
-}
-
-const isShiftAmount = (text: string): boolean => {
-  if (!isNumeric(text)) return false;
-  return 0 <= +text && +text <= Math.pow(2,5) - 1;
-}
-
-/**
- * Returns true if a label (string) is found in the symbol table 
- */
-const isLabel = (text: string): boolean => {
-  return symtab.has(text);
-}
-
-/**
- * Returns true if a string represents a finite number 
- */
-const isNumeric = (numberRepresentation: string): boolean => {
-  return numberRepresentation.trim() !== "" && Number.isFinite(+numberRepresentation);
-}
-
-const validateLabelName = (label: string): boolean | string => {
-  // No empty string labels
-  if (label === "") return `Empty label`;
-  // No spaces in the label name
-  if (/\s/.test(label)) return `Invalid label ${label}`;
-  // Only letters or _ for the first character
-  if (!/^[A-Za-z_]$/.test(label[0])) return `Illegal first character for label ${label}`;
-  // All subsequent characters in the label must be alphanumeric or _
-  for (let index = 1; index < label.length; index++){
-    if (!/^[A-Za-z0-9_]$/.test(label[index])) return `Illegal label ${label}, special characters not allowed`;
+export const lineToInstruction = (line: string): Instruction => {
+  // Separate each line into an instruction name and its arguments ("addi" + "$t0, $t0, 1")
+  const firstSpaceIndex = line.indexOf(" ");
+  if (firstSpaceIndex === -1) throw new Error(`Invalid syntax, instruction is missing a space`)
+  const instructionName = line.slice(0, firstSpaceIndex).toLowerCase();
+  // Get the instruction's operands (e.g. addi => ["rs", "rt", "imm"])
+  const instructionSpec = InstructionSpec.get(instructionName);
+  let lineArguments = line.slice(firstSpaceIndex).replace(/\s+/g, "").split(",").filter(arg => arg !== "");
+  if (instructionSpec === undefined) throw new Error(`Instruction ${instructionName} not found`);
+  // Handle the special syntax of memory instructions i.e. rt, imm(rs) 
+  if (MemoryInstructions.indexOf(instructionName) !== -1){
+    if (lineArguments.length !== 2) throw new Error(`Invalid argument count for ${instructionName} instruction`)
+    const displacementArg = lineArguments.pop();
+    if (displacementArg === undefined) throw new Error(`Invalid syntax for ${instructionName} instruction`);
+    const openParenIndex = displacementArg.indexOf("(");
+    if (openParenIndex === -1 || displacementArg.slice(-1) !== ")") throw new Error(`Invalid syntax for ${instructionName} instruction`);
+    // Push the offset immediate
+    lineArguments.push(displacementArg.slice(0, openParenIndex));
+    // Push the rs argument
+    lineArguments.push(displacementArg.slice(openParenIndex + 1, displacementArg.length - 1));
   }
-  // No duplicate labels
-  if (label in symtab) return `Duplicate label ${label}`;
-  return true;
+  const operandFields = instructionSpec.fields;
+  const operandTypes = instructionSpec.types;
+  // Generate the line's corresponding instruction
+  const instruction: Instruction = {
+    name: instructionName, rs: -1, rt: -1, rd: -1, shamt: -1, imm: -1, target: -1
+  }
+  // Arity mismatch
+  if (lineArguments.length !== operandFields.length){
+    throw new Error(
+      `Invalid argument count for ${instructionName} (expected ${operandFields.length}, got ${lineArguments.length})\n` +
+      `Usage: ${instructionName} ${operandFields.join(", ")}`
+    );
+  }
+  // Put the line arguments into the instruction's fields
+  for (let index = 0; index < operandFields.length; index++){
+    const lineArgument = lineArguments[index];
+    const field = operandFields[index];
+    const operandType = operandTypes[index];
+    if (operandType === "Register") {
+      if (!isRegister(lineArgument)) throw new Error(`Invalid register argument ${lineArgument}`);
+      instruction[field] = (registerNames.includes(lineArgument)) ? registerNames.indexOf(lineArgument) : +lineArgument.slice(1);
+    } else if (operandType === "UImm16") {
+      if (!isUImm16(lineArgument)) throw new Error(`Invalid UImm16 argument ${lineArgument}`);
+      instruction[field] = +lineArgument;
+    } else if (operandType === "Imm16") {
+      if (!isImm16(lineArgument)) throw new Error(`Invalid Imm16 argument ${lineArgument}`);
+      instruction[field] = +lineArgument;
+    } else if (operandType === "UImm32") {
+      if (!isUImm32(lineArgument)) throw new Error(`Invalid UImm32 argument ${lineArgument}`);
+      instruction[field] = +lineArgument;
+    } else if (operandType === "Imm32") {
+      if (!isImm32(lineArgument)) throw new Error(`Invalid Imm32 argument ${lineArgument}`);
+      instruction[field] = +lineArgument;
+    } else if (operandType === "ShiftAmount") {
+      if (!isShiftAmount(lineArgument)) throw new Error(`Invalid ShiftAmount argument ${lineArgument}`);
+      instruction[field] = +lineArgument;
+    } else if (operandType === "Label") {
+      if (!isLabel(lineArgument)) throw new Error(`Invalid Label argument ${lineArgument}`);
+      instruction[field] = symtab.get(lineArgument)!;
+    }
+  }
+  return instruction;
+}
+
+export const parse = (programText: string): Instruction[] => {
+  // stripping comments + trailing & leading whitespace
+  const programLines = parseLabels(minify(programText.split("\n")), symtab);
+  return programLines.map(line => lineToInstruction(line));
 }
 
 export const runProgram = (programText: string): void => {
@@ -309,4 +255,69 @@ export const updateMemoryViewAddress = (newAddress: string): string => {
   newAddress = String(Math.max(0, Math.min(+newAddress, MAX_ADDRESSABLE)));
   memoryViewAddress = +newAddress;
   return newAddress;
+}
+
+const isRegister = (text: string): boolean => {
+  // Disallow user access to special-purpose registers
+  if (text === "$pc" || text === "$hi" || text === "$lo") return false;
+  // Symbolic register (e.g. $v0)
+  if (registerNames.includes(text)) return true;
+  // Numeric register (e.g. $5)
+  if (text[0] === "$" && isNumeric(text.slice(1)) && 0 <= +text.slice(1) && +text.slice(1) <= 31) return true;
+  return false
+}
+
+const isUImm16 = (text: string): boolean => {
+  if (!isNumeric(text)) return false;
+  return 0 <= +text && +text <= Math.pow(2,16) - 1;
+}
+
+const isImm16 = (text: string): boolean => {
+  if (!isNumeric(text)) return false;
+  return -Math.pow(2,15) <= +text && +text <= Math.pow(2,15) - 1;
+}
+
+const isUImm32 = (text: string): boolean => {
+  if (!isNumeric(text)) return false;
+  return 0 <= +text && +text <= Math.pow(2,32) - 1;
+}
+
+const isImm32 = (text: string): boolean => {
+  if (!isNumeric(text)) return false;
+  return -Math.pow(2,31) <= +text && +text <= Math.pow(2,31) - 1;
+}
+
+const isShiftAmount = (text: string): boolean => {
+  if (!isNumeric(text)) return false;
+  return 0 <= +text && +text <= Math.pow(2,5) - 1;
+}
+
+/**
+ * Returns true if a label (string) is found in the symbol table 
+ */
+const isLabel = (text: string): boolean => {
+  return symtab.has(text);
+}
+
+/**
+ * Returns true if a string represents a finite number 
+ */
+const isNumeric = (numberRepresentation: string): boolean => {
+  return numberRepresentation.trim() !== "" && Number.isFinite(+numberRepresentation);
+}
+
+export const validateLabelName = (label: string): boolean | string => {
+  // No empty string labels
+  if (label === "") return `Empty label`;
+  // No spaces in the label name
+  if (/\s/.test(label)) return `Invalid label ${label}`;
+  // Only letters or _ for the first character
+  if (!/^[A-Za-z_]$/.test(label[0])) return `Illegal first character for label ${label}`;
+  // All subsequent characters in the label must be alphanumeric or _
+  for (let index = 1; index < label.length; index++){
+    if (!/^[A-Za-z0-9_]$/.test(label[index])) return `Illegal label ${label}, special characters not allowed`;
+  }
+  // No duplicate labels
+  if (label in symtab) return `Duplicate label ${label}`;
+  return true;
 }

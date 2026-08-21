@@ -1,13 +1,13 @@
 import { registers, registerNames, DataMemory, DATA_MEM_SIZE } from "./interpreter";
 
 export type Instruction = {
-  name: string,    // corresponds to opcode      (6-bits)
+  name: string,    // opcode                     (6-bits)
   rs: number,      // source 1 register          (5-bits)
   rt: number,      // source 2 register          (5-bits)
   rd: number,      // destination register       (5-bits)
   shamt: number,   // shift amount               (5-bits)
-  imm: number,     // the imm/addr of an I-type  (16-bits)
-  target: number   // the 26-bit J-type addr     (26-bits)
+  imm: number,     // imm/addr of an I-type      (16-bits)
+  target: number   // 26-bit J-type addr         (26-bits)
 }
 
 export const MemoryInstructions: string[] = [

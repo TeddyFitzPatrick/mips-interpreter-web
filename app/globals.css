@@ -2,7 +2,11 @@
 
 /* codemirror editor */
 .cm-editor{
-  @apply bg-color1 w-full h-full text-lg min-h-96
+  @apply bg-color1 w-full h-full text-lg min-h-96 overflow-auto max-h-[600px]
+}
+
+.cm-content{
+  @apply min-h-full
 }
 
 .cm-editor.cm-s-dark {

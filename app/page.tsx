@@ -1,9 +1,12 @@
+"use client";
+
 import { useEffect, useRef, type ChangeEvent} from 'react';
-import { createRoot } from 'react-dom/client';
 import { EditorView, keymap, lineNumbers, gutter } from "@codemirror/view";
 import { defaultKeymap } from "@codemirror/commands";
+import { autocompletion, CompletionContext, Completion } from "@codemirror/autocomplete";
 import { registers, registerNames, updateMemoryViewAddress, updateMemoryView, updateRegisterDisplay, runProgram, resetProgram} from './interpreter';
-import './index.css'
+import autocompletions from './autocomplete'; 
+import './globals.css'
 
 export let numberFormat: number = 10; // DEFAULT = Decimal
 
@@ -35,13 +38,13 @@ addi $sp, $sp, 4
 
 function Editor(){
   const editorRef = useRef<HTMLDivElement | null>(null);
-  const savedCode = localStorage.getItem("storedCode");
-  const editorCode = savedCode ?? defaultCode;
   useEffect(() => {
-    if (!editorRef.current) return;
+    if (!editorRef.current) throw new Error(`react error : editorRef undefined`);
+    const editorCode = localStorage.getItem("storedCode") ?? defaultCode;
     textEditor = new EditorView({
       doc: editorCode,
       extensions: [
+        autocompletion({ override: [autocompletions] }),
         keymap.of(defaultKeymap),
         lineNumbers(),
         gutter({class: "cm-mygutter"}),
@@ -53,6 +56,11 @@ function Editor(){
       ],
       parent: editorRef.current
     });
+
+    return () => {
+      textEditor.destroy();
+      editorRef.current = null;
+    }
   }, []);
   return <div ref={editorRef} className="flex w-full h-1/2"></div>;
 }
@@ -105,7 +113,7 @@ function RegisterView(){
       {/* register values */}
       <ul className="w-full h-fit flex flex-col md:flex-row flex-wrap justify-between space-y-2">
         {Array.from(registers.slice(0,32)).map((_value, index) => (
-          <li key={index} className="w-full md:w-[49%] 2xl:w-[24.5%] h-fit bg-color2 rounded-xl flex flex-row items-center justify-center space-x-4">
+          <li key={index} className="w-full md:w-[49%] h-fit bg-color2 rounded-xl flex flex-row items-center justify-center space-x-4">
             {/* e.g. $t0 */}
             <h1 className="font-extrabold text-[100%]">{registerNames[index]}:</h1>
             {/* e.g. 00000000 */}
@@ -151,30 +159,30 @@ function MemoryView(){
   </div>
 }
 
-const root = document.getElementById("root");
-if (root !== undefined && root !== null && !root.hasChildNodes()){
-  createRoot(document.getElementById('root')!).render(
-    <div className="flex flex-col sm:flex-row space-y-6 sm:space-y-0 w-full max-w-screen min-h-screen h-fit bg-color4 p-4 space-x-4 text-slate-800">
-      <div className="w-full sm:w-1/2 h-full flex flex-col space-y-4">
-        {/* Editor  */}
-        <div className="flex flex-col w-full h-full rounded-xl bg-color3 p-4 shadow-xl">
-          <Editor/> 
-          <Buttons/>
-        </div>
-        {/* Error Output */}
-        <div className="bg-color3 w-full h-full rounded-xl shadow-xl p-4 space-y-2">
-          <h1 className="font-bold text-xl">
-            Error Output
-          </h1>
-          <textarea id="errorOutput" disabled className="resize-none w-full h-full text-red-500 rounded-lg p-2 text-red bg-color1 font-bold"></textarea>
-        </div>
+export default function Page(){
+  return <>
+  <html>
+  <body className="flex flex-col sm:flex-row space-y-6 sm:space-y-0 w-full max-w-screen min-h-screen h-fit bg-color4 p-4 space-x-4 text-slate-800">
+    <div className="w-full sm:w-1/2 h-full flex flex-col space-y-4">
+      {/* Editor  */}
+      <div className="flex flex-col w-full h-full rounded-xl bg-color3 p-4 shadow-xl">
+        <Editor/> 
+        <Buttons/>
       </div>
-
-      <div className="flex flex-col w-full sm:w-1/2 h-full space-y-4">
-        <RegisterView/>
-        <MemoryView/>
+      {/* Error Output */}
+      <div className="bg-color3 w-full h-full rounded-xl shadow-xl p-4 space-y-2">
+        <h1 className="font-bold text-xl">
+          Error Output
+        </h1>
+        <textarea id="errorOutput" disabled className="resize-none w-full h-full text-red-500 rounded-lg p-2 text-red bg-color1 font-bold"></textarea>
       </div>
-
     </div>
-  )
+
+    <div className="flex flex-col w-full sm:w-1/2 h-full space-y-4">
+      <RegisterView/>
+      <MemoryView/>
+    </div>
+  </body>
+  </html>
+  </>
 }
