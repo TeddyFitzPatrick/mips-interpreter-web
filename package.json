@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "vitest",
+    "test:rin": "vitest run"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.3",
@@ -15,6 +17,7 @@
     "@codemirror/view": "^6.43.9",
     "codemirror": "^6.0.2",
     "next": "16.3.2",
+    "nextjs": "^0.0.3",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },
@@ -26,6 +29,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.2",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.11"
   }
 }

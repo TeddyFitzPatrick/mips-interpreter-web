@@ -1,6 +1,6 @@
 import { registerNames } from "./interpreter";
 import { CompletionContext, Completion, CompletionResult } from "@codemirror/autocomplete";
-import { InstructionSpec, InstructionSpecType, Operand, OperandType,  } from "./instructions";
+import { InstructionCategory, InstructionSpec, InstructionSpecType, Operand, OperandType,  } from "./instructions";
 import { parseLabels, minify } from "./interpreter";
 
 export default function autocompletions(context: CompletionContext): CompletionResult {
@@ -17,10 +17,8 @@ export default function autocompletions(context: CompletionContext): CompletionR
   parseLabels(minify(programText.split("\n")), symtab, true);
   const labels = symtab.keys() 
 
-  console.log(`word: <${word!.text}> <${typeof(word)}>`)
-  
   // Don't show autocompletion options
-  if ((!word && !context.explicit) || (word && !word.text)) 
+  if ((!word && !context.explicit) || (word && !word.text && currentInstruction === undefined)) 
     return {from: context.pos, options: [], filter: true};
   
   // register name autocompletes
@@ -44,13 +42,14 @@ export default function autocompletions(context: CompletionContext): CompletionR
     const spec: InstructionSpecType = instr[1];
     const fields: Operand[] = spec.fields;
     const types: OperandType[] = spec.types;
+    const category: InstructionCategory = spec.category;
     const instrAutocomplete: Completion = {
       label: `${name}`,
       type: `function`,
       detail: `=> ${name}/${fields.length} [${fields.map((field: Operand, i: number) => {
         const argType = types[i];
         return `${field} (${argType})`;
-      }).join(", ")}]`,
+      }).join(", ")}] (${category.toUpperCase()})`,
       apply: `${name} `
     }
     instrAutocompletes.push(instrAutocomplete);

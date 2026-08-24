@@ -32,10 +32,15 @@ export type OperandType =
 
 export type InstructionFunction = (instr: Instruction) => void;
 
+export type InstructionCategory = 
+    | 'native'
+    | 'pseudo';
+
 export type InstructionSpecType = {
     func: InstructionFunction,
     fields: Operand[],
     types: OperandType[],
+    category: InstructionCategory
 };
 
 export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
@@ -44,88 +49,105 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
             registers[instr.rd] = registers[instr.rs] + registers[instr.rt];
         },
         fields: ["rd", "rs", "rt"],
-        types: ["Register", "Register", "Register"]
+        types: ["Register", "Register", "Register"],
+        category: 'native'
     }],
     ["sub", {
         func: (instr: Instruction): void => {
             registers[instr.rd] = registers[instr.rs] - registers[instr.rt];
         },
         fields: ["rd", "rs", "rt"],
-        types: ["Register", "Register", "Register"]
+        types: ["Register", "Register", "Register"],
+        category: 'native'
     }],
     ["and", {
         func: (instr: Instruction): void => {
             registers[instr.rd] = registers[instr.rs] & registers[instr.rt];
         },
         fields: ["rd", "rs", "rt"],
-        types: ["Register", "Register", "Register"]
+        types: ["Register", "Register", "Register"],
+        category: 'native'
     }],
     ["or", {
         func: (instr: Instruction): void => {
             registers[instr.rd] = registers[instr.rs] | registers[instr.rt];
         },
         fields: ["rd", "rs", "rt"],
-        types: ["Register", "Register", "Register"]
+        types: ["Register", "Register", "Register"],
+        category: 'native'
     }],
     ["xor", {
         func: (instr: Instruction): void => {
             registers[instr.rd] = registers[instr.rs] ^ registers[instr.rt];
         },
         fields: ["rd", "rs", "rt"],
-        types: ["Register", "Register", "Register"]
+        types: ["Register", "Register", "Register"],
+        category: 'native'
     }],
     ["nor", {
         func: (instr: Instruction): void => {
             registers[instr.rd] = ~(registers[instr.rs] | registers[instr.rt]);
         },
         fields: ["rd", "rs", "rt"],
-        types: ["Register", "Register", "Register"]
+        types: ["Register", "Register", "Register"],
+        category: 'native'
     }],
     ["slt", {
         func: (instr: Instruction): void => {
             registers[instr.rd] = (registers[instr.rs] < registers[instr.rt]) ? 1 : 0;
         },
         fields: ["rd", "rs", "rt"],
-        types: ["Register", "Register", "Register"]
+        types: ["Register", "Register", "Register"],
+        category: 'native'
     }],
     ["sll", {
         func: (instr: Instruction): void => {
             registers[instr.rd] = registers[instr.rt] << instr.shamt;
         },
         fields: ["rd", "rt", "shamt"],
-        types: ["Register", "Register", "ShiftAmount"]
+        types: ["Register", "Register", "ShiftAmount"],
+        category: 'native'
     }],
     ["srl", {
+        func: (instr: Instruction): void => {
+            registers[instr.rd] = registers[instr.rt] >>> instr.shamt;
+            },
+        fields: ["rd", "rt", "shamt"],
+        types: ["Register", "Register", "ShiftAmount"],
+        category: 'native'
+    }],
+    ["sra", {
         func: (instr: Instruction): void => {
             registers[instr.rd] = registers[instr.rt] >> instr.shamt;
         },
         fields: ["rd", "rt", "shamt"],
-        types: ["Register", "Register", "ShiftAmount"]
+        types: ["Register", "Register", "ShiftAmount"],
+        category: 'native'
     }],
-    // ["sra", {
-    //     func: (instr: Instruction): void => {
-    //     },
-    //     fields: [],
-    //     types: []
-    // }],
-    // ["sllv", {
-    //     func: (instr: Instruction): void => {
-    //     },
-    //     fields: [],
-    //     types: []
-    // }],
-    // ["srlv", {
-    //     func: (instr: Instruction): void => {
-    //     },
-    //     fields: [],
-    //     types: []
-    // }],
-    // ["srav", {
-    //     func: (instr: Instruction): void => {
-    //     },
-    //     fields: [],
-    //     types: []
-    // }],
+    ["sllv", {
+        func: (instr: Instruction): void => {
+            registers[instr.rd] = registers[instr.rt] << registers[instr.rs];
+        },
+        fields: ["rd", "rt", "rs"],
+        types: ["Register", "Register", "Register"],
+        category: 'native'
+    }],
+    ["srlv", {
+        func: (instr: Instruction): void => {
+            registers[instr.rd] = registers[instr.rt] >>> registers[instr.rs];
+        },
+        fields: ["rd", "rt", "rs"],
+        types: ["Register", "Register", "Register"],
+        category: 'native'
+    }],
+    ["srav", {
+        func: (instr: Instruction): void => {
+            registers[instr.rd]= registers[instr.rt] >> registers[instr.rs];
+        },
+        fields: ["rd", "rt", "rs"],
+        types: ["Register", "Register", "Register"],
+        category: 'native'
+    }],
     ["mult", {
         func: (instr: Instruction): void => {
             // produce a temporary 64-bit product 
@@ -136,7 +158,8 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
             registers[registerNames.indexOf("$lo")] = Number(product & BigInt(0xFFFFFFFF));
         },
         fields: ["rs", "rt"],
-        types: ["Register", "Register"]
+        types: ["Register", "Register"],
+        category: 'native'
     }],
     ["div", {
         func: (instr: Instruction): void => {
@@ -144,123 +167,139 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
             registers[registerNames.indexOf("$hi")] = (registers[instr.rs] % registers[instr.rt]) | 0;
         },
         fields: ["rs", "rt"],
-        types: ["Register", "Register"]
+        types: ["Register", "Register"],
+        category: 'native'
     }],
     ["mfhi", {
         func: (instr: Instruction): void => {
             registers[instr.rd] = registers[registerNames.indexOf("$hi")];
         },
         fields: ["rd"],
-        types: ["Register"]
+        types: ["Register"],
+        category: 'native'
     }],
     ["mflo", {
         func: (instr: Instruction): void => {
             registers[instr.rd] = registers[registerNames.indexOf("$lo")];
         },
         fields: ["rd"],
-        types: ["Register"]
+        types: ["Register"],
+        category: 'native'
     }],
     ["addi", {
         func: (instr: Instruction): void => {
             registers[instr.rt] = registers[instr.rs] + instr.imm;
         },
         fields: ["rt", "rs", "imm"],
-        types: ["Register", "Register", "Imm16"]
+        types: ["Register", "Register", "Imm16"],
+        category: 'native'
     }],
     ["andi", {
         func: (instr: Instruction): void => {
             registers[instr.rt] = registers[instr.rs] & instr.imm;
         },
         fields: ["rt", "rs", "imm"],
-        types: ["Register", "Register", "UImm16"]
+        types: ["Register", "Register", "UImm16"],
+        category: 'native'
     }],
     ["ori", {
         func: (instr: Instruction): void => {
             registers[instr.rt] = registers[instr.rs] | instr.imm;
         },
         fields: ["rt", "rs", "imm"],
-        types: ["Register", "Register", "UImm16"]
+        types: ["Register", "Register", "UImm16"],
+        category: 'native'
     }],
     ["xori", {
         func: (instr: Instruction): void => {
             registers[instr.rt] = registers[instr.rs] ^ +instr.imm;
         },
         fields: ["rt", "rs", "imm"],
-        types: ["Register", "Register", "UImm16"]
+        types: ["Register", "Register", "UImm16"],
+        category: 'native'
     }],
     ["slti", {
         func: (instr: Instruction): void => {
             registers[instr.rt] = (registers[instr.rs] < instr.imm) ? 1 : 0;
         },
         fields: ["rt", "rs", "imm"],
-        types: ["Register", "Register", "Imm16"]
+        types: ["Register", "Register", "Imm16"],
+        category: 'native'
     }],
-    // ["lui", {
-    //     func: (instr: Instruction): void => {
-
-    //     },
-    //     fields: [],
-    //     types: []
-    // }],
-    // ["lb", {
-    //     func: (instr: Instruction): void => {
-
-    //     },
-    //    fields: ["rt", "imm", "rs"],
-    //    types: ["Register", "Imm16", "Register"]
-    // }],
-    // ["lh", {
-    //     func: (instr: Instruction): void => {
-    //         const effectiveAddress = registers[instr.rs] + instr.imm;
-    //         validateAddress(effectiveAddress);
-    //         // remember to add sign extension
-    //     },
-    //     fields: ["rt", "imm", "rs"],
-    //     types: ["Register", "Imm16", "Register"]
-    // }],
+    ["lui", {
+        func: (instr: Instruction): void => {
+            registers[instr.rt] = ((instr.imm | 0) << 16);
+        },
+        fields: ["rt", "imm"],
+        types: ["Register", "UImm16"],
+        category: 'native'
+    }],
+    ["lb", {
+        func: (instr: Instruction): void => {
+            const effectiveAddress = getEffectiveAddress(registers[instr.rs], instr.imm);
+            // (>> is arithmetic - sign extends by default)
+            registers[instr.rt] = (DataMemory[effectiveAddress] << 24) >> 24;
+        },
+        fields: ["rt", "imm", "rs"],
+        types: ["Register", "Imm16", "Register"],
+        category: 'native'
+    }],
+    ["lh", {
+        func: (instr: Instruction): void => {
+            const effectiveAddress = getEffectiveAddress(registers[instr.rs], instr.imm);
+            const halfword = (DataMemory[effectiveAddress] << 8) | DataMemory[effectiveAddress + 1];
+            // sign-extend the halfword
+            registers[instr.rt] = (halfword << 16) >> 16;
+        },
+        fields: ["rt", "imm", "rs"],
+        types: ["Register", "Imm16", "Register"],
+        category: 'native'
+    }],
     ["lw", {
         func: (instr: Instruction): void => {            
-            const effectiveAddress = registers[instr.rs] + instr.imm;
-            validateAddress(effectiveAddress);
-            registers[instr.rt] = Number(
-                  BigInt(DataMemory[effectiveAddress] << 24)
-                + BigInt(DataMemory[effectiveAddress+1] << 16)
-                + BigInt(DataMemory[effectiveAddress+2] << 8)
-                + BigInt(DataMemory[effectiveAddress+3]));
+            const effectiveAddress = getEffectiveAddress(registers[instr.rs], instr.imm);
+            registers[instr.rt] = (DataMemory[effectiveAddress] << 24)
+                | (DataMemory[effectiveAddress + 1] << 16)
+                | (DataMemory[effectiveAddress + 2] << 8)
+                | (DataMemory[effectiveAddress + 3]
+            ) | 0;
         },
         fields: ["rt", "imm", "rs"],
-        types: ["Register", "Imm16", "Register"]
+        types: ["Register", "Imm16", "Register"],
+        category: 'native'
     }],
-    // ["sb", {
-    //     func: (instr: Instruction): void => {
-
-    //     },
-    //     fields: [],
-    //     types: []
-    // }],
-    // ["sh", {
-    //     func: (instr: Instruction): void => {
-
-    //     },
-    //     fields: [],
-    //     types: []
-    // }],
+    ["sb", {
+        func: (instr: Instruction): void => {
+            const effectiveAddress = getEffectiveAddress(registers[instr.rs], instr.imm);
+            DataMemory[effectiveAddress] = (registers[instr.rt] & 0xFF);
+        },
+        fields: ["rt", "imm", "rs"],
+        types: ["Register", "Imm16", "Register"],
+        category: 'native'
+    }],
+    ["sh", {
+        func: (instr: Instruction): void => {
+            const effectiveAddress = getEffectiveAddress(registers[instr.rs], instr.imm);
+            DataMemory[effectiveAddress] = (registers[instr.rt] & 0xFF00) >>> 8;
+            DataMemory[effectiveAddress + 1] = (registers[instr.rt] & 0xFF); 
+        }, 
+        fields: ["rt", "imm", "rs"],
+        types: ["Register", "Imm16", "Register"],
+        category: 'native'
+    }],
     ["sw", {
         func: (instr: Instruction): void => {
-            const effectiveAddress = registers[instr.rs] + instr.imm;
-            validateAddress(effectiveAddress);
-            const wordValue = registers[instr.rt];
+            const effectiveAddress = getEffectiveAddress(registers[instr.rs], instr.imm);
             // bits 31-24 (most significant bits)
-            DataMemory[effectiveAddress] = Number(BigInt(wordValue) & BigInt(0xff000000)) >> 24;
-            // bits 23-16
-            DataMemory[effectiveAddress + 1] = Number(BigInt(wordValue) & BigInt(0xff0000)) >> 16;
-            // bits 15-8
-            DataMemory[effectiveAddress + 2] = Number(BigInt(wordValue) & BigInt(0xff00)) >> 8;
+            DataMemory[effectiveAddress] = (registers[instr.rt] & 0xFF000000) >>> 24;
+            DataMemory[effectiveAddress + 1] = (registers[instr.rt] & 0xFF0000) >>> 16;
+            DataMemory[effectiveAddress + 2] = (registers[instr.rt] & 0xFF00) >>> 8;
             // bits 7-0 (least significant bits)
-            DataMemory[effectiveAddress + 3] = Number(BigInt(wordValue) & BigInt(0xff));
+            DataMemory[effectiveAddress + 3] = (registers[instr.rt] & 0xFF)
         },
         fields: ["rt", "imm", "rs"],
-        types: ["Register", "Imm16", "Register"]
+        types: ["Register", "Imm16", "Register"],
+        category: 'native'
     }],
     ["beq", {
         func: (instr: Instruction): void => {
@@ -269,7 +308,8 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
             }
         },
         fields: ["rs", "rt", "imm"],
-        types: ["Register", "Register", "Label"]
+        types: ["Register", "Register", "Label"],
+        category: 'native'
     }],
     ["bne", {
         func: (instr: Instruction): void => {
@@ -278,21 +318,24 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
             }
         },
         fields: ["rs", "rt", "imm"],
-        types: ["Register", "Register", "Label"]
+        types: ["Register", "Register", "Label"],
+        category: 'native'
     }],
     ["j", {
         func: (instr: Instruction): void => {
             registers[registerNames.indexOf("$pc")] = instr.target;
         },
         fields: ["target"],
-        types: ["Label"]
+        types: ["Label"],
+        category: 'native'
     }],
     ["jr", {
         func: (instr: Instruction): void => {
             registers[registerNames.indexOf("$pc")] = registers[instr.rs];
         },
         fields: ["rs"],
-        types: ["Register"]
+        types: ["Register"],
+        category: 'native'
     }],
     ["jal", {
         func: (instr: Instruction): void => {
@@ -300,48 +343,81 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
             registers[registerNames.indexOf("$pc")] = instr.target;
         },
         fields: ["target"],
-        types: ["Label"]
+        types: ["Label"],
+        category: 'native'
     }],
     // Pseudos
+    ["bge", {
+        func: (instr: Instruction): void => {
+            const rs = registers[instr.rs] | 0;
+            const rt = registers[instr.rt] | 0;
+            registers[registerNames.indexOf('$at')] = (rs < rt) ? 1 : 0;
+            if (registers[registerNames.indexOf('$at')] === registers[registerNames.indexOf('$zero')]) {
+                registers[registerNames.indexOf("$pc")] = instr.imm;
+            }
+        },
+        fields: ["rs", "rt", "imm"],
+        types: ["Register", "Register", "Label"],
+        category: 'pseudo'
+    }],
+    ["ble", {
+        func: (instr: Instruction): void => {
+            const rs = registers[instr.rs] | 0;
+            const rt = registers[instr.rt] | 0;
+            registers[registerNames.indexOf('$at')] = (rt < rs) ? 1 : 0;
+            if (registers[registerNames.indexOf('$at')] === registers[registerNames.indexOf('$zero')]) {
+                registers[registerNames.indexOf("$pc")] = instr.imm;
+            }
+        },
+        fields: ["rs", "rt", "imm"],
+        types: ["Register", "Register", "Label"],
+        category: 'pseudo'
+    }],
     ["jalr", {
         func: (instr: Instruction): void => {
             registers[registerNames.indexOf("$ra")] = registers[registerNames.indexOf("$pc")] + 4;
             registers[registerNames.indexOf("$pc")] = registers[instr.rs];
         },
         fields: ["rs"],
-        types: ["Register"]
+        types: ["Register"],
+        category: 'pseudo'
     }],
     ["li", {
         func: (instr: Instruction): void => {
             registers[instr.rs] = instr.imm;
         },
         fields: ["rs", "imm"],
-        types: ["Register", "Imm32"]
+        types: ["Register", "Imm32"],
+        category: 'pseudo'
     }],
     ["la", {
         func: (instr: Instruction): void => {
             registers[instr.rs] = instr.imm;
         },
         fields: ["rs", "imm"],
-        types: ["Register", "Label"]
+        types: ["Register", "Label"],
+        category: 'pseudo'
     }],
     ["move", {
         func: (instr: Instruction): void => {
             registers[instr.rd] = registers[instr.rs];
         },
         fields: ["rd", "rs"],
-        types: ["Register", "Register"]
+        types: ["Register", "Register"],
+        category: 'pseudo'
     }],
     ["mul", {
         func: (instr: Instruction): void => {
             registers[instr.rd] = registers[instr.rs] * registers[instr.rt];
         },
         fields: ["rd", "rs", "rt"],
-        types: ["Register", "Register", "Register"]
+        types: ["Register", "Register", "Register"],
+        category: 'pseudo'
     }]
 ]);
 
-
-const validateAddress = (address: number): void => {
-    if (address < 0 || address > DATA_MEM_SIZE - 4) throw new Error("Segmentation fault");
+const getEffectiveAddress = (base: number, offset: number): number => {
+    const effectiveAddress = base + offset;
+    if (effectiveAddress < 0 || effectiveAddress > DATA_MEM_SIZE - 4) throw new Error("Segmentation fault");
+    return effectiveAddress;
 }

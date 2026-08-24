@@ -113,14 +113,14 @@ function RegisterView(){
       {/* register values */}
       <ul className="w-full h-fit flex flex-col md:flex-row flex-wrap justify-between space-y-2">
         {Array.from(registers.slice(0,32)).map((_value, index) => (
-          <li key={index} className="w-full md:w-[49%] h-fit bg-color2 rounded-xl flex flex-row items-center justify-center space-x-4">
+          <li key={index} className="w-full md:w-[49%] h-fit py-0.5 bg-color2 rounded-xl flex flex-row items-center justify-center space-x-4">
             {/* e.g. $t0 */}
-            <h1 className="font-extrabold text-[100%]">{registerNames[index]}:</h1>
+            <h1 className="font-bold text-[110%]">{registerNames[index]}:</h1>
             {/* e.g. 00000000 */}
             <div id={"reg" + index.toString()}  className={
               index === 0 
               ?  "text-[100%] font-bold py-1" 
-              : "bg-white text-[100%] rounded-xl py-1 px-2 shadow-xl font-bold"
+              : "bg-white text-[100%] py-1 px-2 shadow-xl font-bold w-32 whitespace-nowrap overflow-x-auto scrollbar-none"
             }>
             </div>
           </li>

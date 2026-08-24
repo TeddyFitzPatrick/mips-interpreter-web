@@ -162,8 +162,7 @@ export const parse = (programText: string): Instruction[] => {
 }
 
 export const runProgram = (programText: string): void => {
-  // set $pc to 0
-  registers[registerNames.indexOf("$pc")] = 0;
+  resetProgram();
   // clear the error output
   const errorOutput: HTMLElement | null = document.getElementById("errorOutput");
   if (errorOutput === null) throw new Error('Could not find the error output!');
@@ -225,7 +224,12 @@ export const getRegisterOutput = (register: number, numberFormat: number): strin
   } else if (numberFormat === 16){
     registerPrefix = '0x';
   }
-  return registerPrefix + registers[register].toString(numberFormat).toUpperCase();
+  let registerContents = registers[register];
+  // sign decimal numbers
+  if (numberFormat === 10) {
+    registerContents |= 0;
+  } 
+  return registerPrefix + registerContents.toString(numberFormat).toUpperCase();  // uppercase for hex (0xff => 0xFF)
 }
 
 export const updateRegisterDisplay = (numberFormat: number): void => {
