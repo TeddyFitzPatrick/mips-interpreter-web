@@ -16,7 +16,9 @@ export type Instruction = {
 
 export const MemoryInstructions: string[] = [
     "lb",
+    "lbu",
     "lh",
+    "lhu",
     "lw",
     "sb",
     "sh",
@@ -264,6 +266,15 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
         types: ["Register", "Imm16", "Register"],
         category: 'native'
     }],
+    ["lbu", {
+        func: (instr: Instruction): void => {
+            const effectiveAddress = getEffectiveAddress(registers[instr.rs], instr.imm);
+            registers[instr.rt] = (DataMemory[effectiveAddress] & 0xFF);
+        },
+        fields: ["rt", "imm", "rs"],
+        types: ["Register", "Imm16", "Register"],
+        category: 'native'
+    }],
     ["lh", {
         func: (instr: Instruction): void => {
             const effectiveAddress = getEffectiveAddress(registers[instr.rs], instr.imm);
@@ -271,6 +282,17 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
             const halfword = (DataMemory[effectiveAddress] << 8) | DataMemory[effectiveAddress + 1];
             // sign-extend the halfword
             registers[instr.rt] = (halfword << 16) >> 16;
+        },
+        fields: ["rt", "imm", "rs"],
+        types: ["Register", "Imm16", "Register"],
+        category: 'native'
+    }],
+    ["lhu", {
+        func: (instr: Instruction): void => {
+            const effectiveAddress = getEffectiveAddress(registers[instr.rs], instr.imm);
+            if (effectiveAddress % 2 !== 0) throw new Error(UNALIGNED_MEM_ACC_ERROR);
+            const halfword = (DataMemory[effectiveAddress] << 8) | DataMemory[effectiveAddress + 1];
+            registers[instr.rt] = (halfword & 0xFFFF);
         },
         fields: ["rt", "imm", "rs"],
         types: ["Register", "Imm16", "Register"],
