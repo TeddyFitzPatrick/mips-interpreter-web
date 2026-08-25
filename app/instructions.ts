@@ -1,5 +1,9 @@
 import { registers, registerNames, DataMemory, DATA_MEM_SIZE } from "./interpreter";
 
+// error message
+export const UNALIGNED_MEM_ACC_ERROR = 'Address Error (Unaligned Memory Access)';
+export const SEG_FAULT_ERROR = 'Segmentation Fault (Out-of-bounds Memory Access)';
+
 export type Instruction = {
   name: string,    // opcode                     (6-bits)
   rs: number,      // source 1 register          (5-bits)
@@ -50,6 +54,22 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
         },
         fields: ["rd", "rs", "rt"],
         types: ["Register", "Register", "Register"],
+        category: 'native'
+    }],
+    ["addu", {
+        func: (instr: Instruction): void => {
+            registers[instr.rd] = (registers[instr.rs] + registers[instr.rt]) | 0;
+        },
+        fields: ["rd", "rs", "rt"],
+        types: ["Register", "Register", "Register"],
+        category: 'native'
+    }],
+    ["addiu", {
+        func: (instr: Instruction): void => {
+            registers[instr.rt] = (registers[instr.rs] + instr.imm) | 0;
+        },
+        fields: ["rt", "rs", "imm"],
+        types: ["Register", "Register", "Imm16"],
         category: 'native'
     }],
     ["sub", {
@@ -247,6 +267,7 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
     ["lh", {
         func: (instr: Instruction): void => {
             const effectiveAddress = getEffectiveAddress(registers[instr.rs], instr.imm);
+            if (effectiveAddress % 2 !== 0) throw new Error(UNALIGNED_MEM_ACC_ERROR);
             const halfword = (DataMemory[effectiveAddress] << 8) | DataMemory[effectiveAddress + 1];
             // sign-extend the halfword
             registers[instr.rt] = (halfword << 16) >> 16;
@@ -258,6 +279,7 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
     ["lw", {
         func: (instr: Instruction): void => {            
             const effectiveAddress = getEffectiveAddress(registers[instr.rs], instr.imm);
+            if (effectiveAddress % 4 !== 0) throw new Error(UNALIGNED_MEM_ACC_ERROR);
             registers[instr.rt] = (DataMemory[effectiveAddress] << 24)
                 | (DataMemory[effectiveAddress + 1] << 16)
                 | (DataMemory[effectiveAddress + 2] << 8)
@@ -280,6 +302,7 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
     ["sh", {
         func: (instr: Instruction): void => {
             const effectiveAddress = getEffectiveAddress(registers[instr.rs], instr.imm);
+            if (effectiveAddress % 2 !== 0) throw new Error(UNALIGNED_MEM_ACC_ERROR);
             DataMemory[effectiveAddress] = (registers[instr.rt] & 0xFF00) >>> 8;
             DataMemory[effectiveAddress + 1] = (registers[instr.rt] & 0xFF); 
         }, 
@@ -290,6 +313,7 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
     ["sw", {
         func: (instr: Instruction): void => {
             const effectiveAddress = getEffectiveAddress(registers[instr.rs], instr.imm);
+            if (effectiveAddress % 4 !== 0) throw new Error(UNALIGNED_MEM_ACC_ERROR);
             // bits 31-24 (most significant bits)
             DataMemory[effectiveAddress] = (registers[instr.rt] & 0xFF000000) >>> 24;
             DataMemory[effectiveAddress + 1] = (registers[instr.rt] & 0xFF0000) >>> 16;
@@ -387,7 +411,7 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
             registers[instr.rs] = instr.imm;
         },
         fields: ["rs", "imm"],
-        types: ["Register", "Imm32"],
+        types: ["Register", "UImm32"],
         category: 'pseudo'
     }],
     ["la", {
@@ -418,6 +442,6 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
 
 const getEffectiveAddress = (base: number, offset: number): number => {
     const effectiveAddress = base + offset;
-    if (effectiveAddress < 0 || effectiveAddress > DATA_MEM_SIZE - 4) throw new Error("Segmentation fault");
+    if (effectiveAddress < 0 || effectiveAddress > DATA_MEM_SIZE - 4) throw new Error(SEG_FAULT_ERROR);
     return effectiveAddress;
 }

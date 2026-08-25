@@ -53,6 +53,8 @@ let symtab: Map<string, number> = new Map<string, number>();
 // Program instructions
 let InstructionMemory: Instruction[] = [];
 
+export let errorText: string = "";
+
 export const minify = (programLines: string[]): string[] => {
   return programLines
     .map(line => {
@@ -164,9 +166,7 @@ export const parse = (programText: string): Instruction[] => {
 export const runProgram = (programText: string): void => {
   resetProgram();
   // clear the error output
-  const errorOutput: HTMLElement | null = document.getElementById("errorOutput");
-  if (errorOutput === null) throw new Error('Could not find the error output!');
-  errorOutput.textContent = "";
+  const errorOutput: HTMLElement | null = (typeof document !== 'undefined') ? document.getElementById("errorOutput") : null;
   try{
     // parse the program text into a list of instructions
     InstructionMemory = parse(programText);
@@ -188,15 +188,17 @@ export const runProgram = (programText: string): void => {
   } catch (error: unknown){
     console.log("error detected");
     resetProgram();
-    // Parsing or program execution failure
+    // catch the error and get its message
     if (error instanceof Error){
-      errorOutput.textContent = error.message;
+      errorText = error.message;
     } else if (typeof error === "string"){
-      errorOutput.textContent = error;
+      errorText = error;
     } else {
-      console.log("Error: ", error);
-      console.log("Unknown error type", typeof error);
+      console.log("Unknown/Unhandled Error: ", error);
+      console.log("Unknown/Unhandled Error Type", typeof error);
     }
+    // populate the errorOutput with the errorText
+    if (errorOutput) errorOutput.textContent = errorText;
   }
 }
 
@@ -211,10 +213,13 @@ export const resetProgram = (): void => {
   InstructionMemory = [];
   // reset data memory 
   DataMemory = new Uint8Array(DATA_MEM_SIZE);
-  // reset error output
-  const errorOutput: HTMLElement | null = document.getElementById("errorOutput");
-  if (errorOutput === null) return;
-  errorOutput.textContent = "";
+  // reset error text and output
+  errorText = "";
+  if (typeof document !== 'undefined'){
+    const errorOutput: HTMLElement | null = document.getElementById("errorOutput");
+    if (errorOutput === null) return;
+    errorOutput.textContent = "";
+  }
 }
 
 export const getRegisterOutput = (register: number, numberFormat: number): string => {

@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest",
-    "test:rin": "vitest run"
+    "test:run": "vitest run"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.3",
