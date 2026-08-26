@@ -106,6 +106,14 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
         types: ["Register", "Register", "Register"],
         category: 'native'
     }],
+    ["nop", {
+        func: (instr: Instruction): void => {
+            // execute the nop (no operation)
+        },
+        fields: [],
+        types: [],
+        category: 'native'
+    }],
     ["nor", {
         func: (instr: Instruction): void => {
             registers[instr.rd] = ~(registers[instr.rs] | registers[instr.rt]);
@@ -116,10 +124,40 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
     }],
     ["slt", {
         func: (instr: Instruction): void => {
+            const rs = registers[instr.rs] | 0;
+            const rt = registers[instr.rt] | 0;
+            registers[instr.rd] = rs < rt ? 1 : 0;
+        },
+        fields: ["rd", "rs", "rt"],
+        types: ["Register", "Register", "Register"],
+        category: 'native'
+    }],
+    ["slti", {
+        func: (instr: Instruction): void => {
+            const rs = registers[instr.rs] | 0;
+            const imm = instr.imm | 0;
+            registers[instr.rt] = rs < imm ? 1 : 0;
+        },
+        fields: ["rt", "rs", "imm"],
+        types: ["Register", "Register", "Imm16"],
+        category: 'native'
+    }],
+    ["sltu", {
+        func: (instr: Instruction): void => {
             registers[instr.rd] = (registers[instr.rs] < registers[instr.rt]) ? 1 : 0;
         },
         fields: ["rd", "rs", "rt"],
         types: ["Register", "Register", "Register"],
+        category: 'native'
+    }],
+    ["sltiu", {
+        func: (instr: Instruction): void => {
+            const rs = registers[instr.rs] >>> 0;
+            const imm = instr.imm >>> 0;
+            registers[instr.rt] = rs < imm ? 1 : 0;
+        },
+        fields: ["rt", "rs", "imm"],
+        types: ["Register", "Register", "Imm16"],
         category: 'native'
     }],
     ["sll", {
@@ -393,32 +431,18 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
         category: 'native'
     }],
     // Pseudos
-    // ["bge", {
-    //     func: (instr: Instruction): void => {
-    //         const rs = registers[instr.rs] | 0;
-    //         const rt = registers[instr.rt] | 0;
-    //         registers[registerNames.indexOf('$at')] = (rs < rt) ? 1 : 0;
-    //         if (registers[registerNames.indexOf('$at')] === registers[registerNames.indexOf('$zero')]) {
-    //             registers[registerNames.indexOf("$pc")] = instr.imm;
-    //         }
-    //     },
-    //     fields: ["rs", "rt", "imm"],
-    //     types: ["Register", "Register", "Label"],
-    //     category: 'pseudo'
-    // }],
-    // ["ble", {
-    //     func: (instr: Instruction): void => {
-    //         const rs = registers[instr.rs] | 0;
-    //         const rt = registers[instr.rt] | 0;
-    //         registers[registerNames.indexOf('$at')] = (rt < rs) ? 1 : 0;
-    //         if (registers[registerNames.indexOf('$at')] === registers[registerNames.indexOf('$zero')]) {
-    //             registers[registerNames.indexOf("$pc")] = instr.imm;
-    //         }
-    //     },
-    //     fields: ["rs", "rt", "imm"],
-    //     types: ["Register", "Register", "Label"],
-    //     category: 'pseudo'
-    // }],
+    ["bge", {
+        func: (instr: Instruction): void => {},
+        fields: ["rs", "rt", "imm"],
+        types: ["Register", "Register", "Label"],
+        category: 'pseudo'
+    }],
+    ["ble", {
+        func: (instr: Instruction): void => {},
+        fields: ["rs", "rt", "imm"],
+        types: ["Register", "Register", "Label"],
+        category: 'pseudo'
+    }],
     // ["jalr", {
     //     func: (instr: Instruction): void => {
     //         registers[registerNames.indexOf("$ra")] = registers[registerNames.indexOf("$pc")] + 4;
@@ -429,9 +453,7 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
     //     category: 'pseudo'
     // }],
     ["li", {
-        func: (instr: Instruction): void => {
-            registers[instr.rs] = instr.imm;
-        },
+        func: (instr: Instruction): void => {},
         fields: ["rt", "imm"],
         types: ["Register", "UImm32"],
         category: 'pseudo'
@@ -477,6 +499,14 @@ export const expandPseudoInstruction = (pseudoInstruction: Instruction): Instruc
                 nativeInstructions.push({name: "lui", rt: pseudoInstruction.rt, imm: (immediateValue >>> 16), rs: -1, rd: -1, shamt: -1, target: -1});
                 nativeInstructions.push({name: "ori", rt: pseudoInstruction.rt, rs: pseudoInstruction.rt, imm: immediateValue & 0xFFFF, rd: -1, shamt: -1, target: -1});
             }
+            break;
+        case "bge":
+            nativeInstructions.push({name: "slt", rd: registerNames.indexOf(`$at`), rs: pseudoInstruction.rs, rt: pseudoInstruction.rt, imm: -1, shamt: -1, target: -1});
+            nativeInstructions.push({name: "beq", rs: registerNames.indexOf(`$at`), rt: 0, imm: pseudoInstruction.imm, rd: -1, shamt: -1, target: -1});
+            break;
+        case "ble":
+            nativeInstructions.push({name: "slt", rd: registerNames.indexOf(`$at`), rs: pseudoInstruction.rt, rt: pseudoInstruction.rs, imm: -1, shamt: -1, target: -1});
+            nativeInstructions.push({name: "beq", rs: registerNames.indexOf(`$at`), rt: 0, imm: pseudoInstruction.imm, rd: -1, shamt: -1, target: -1});
             break;
     }
     return nativeInstructions;
