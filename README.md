@@ -1,36 +1,37 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# MIPS Interpreter
 
-## Getting Started
+A web-based MIPS interpreter with register/memory visualization and line-by-line execution.
 
-First, run the development server:
+## Usage & Limitations
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+* Supports the MIPS (32-bit) assembly language, including: comments, labels, and the instructions listed below.
+* All standard MIPS registers are provided. $zero is read-only and $pc, $hi, and $lo are not directly accessible.
+* Data/Stack memory is byte-addressable, big-endian, ~8MB.
+* Instruction and operand autocomplete suggestions can be accepted with Enter.
+* *dot directives (e.g., .text, .data) is not currently supported.
+* *while the .text segment isn't directly accessible, instructions begin at a virtual address of 0.
+* *syscall is not currently supported.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Supported Instructions
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+**Arithmetic:** `add`, `addu`, `addi`, `addiu`, `sub`
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+**Logical:** `and`, `or`, `xor`, `nor`, `andi`, `ori`, `xori`
 
-## Learn More
+**Comparison:** `slt`, `slti`
 
-To learn more about Next.js, take a look at the following resources:
+**Shifts:** `sll`, `srl`, `sra`, `sllv`, `srlv`, `srav`
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+**Multiply/Divide:** `mult`, `div`, `mfhi`, `mflo`
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+**Memory:** `lb`, `lbu`, `lh`, `lhu`, `lw`, `sb`, `sh`, `sw`
 
-## Deploy on Vercel
+**Branches:** `beq`, `bne`
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+**Jumps:** `j`, `jr`, `jal`
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+**Other:** `lui`
+
+**Pseudo-instructions:** `li`
+
+Memory accesses must be aligned for halfwords and words. Misaligned or out-of-bounds accesses produce an error.
