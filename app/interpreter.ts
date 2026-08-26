@@ -239,6 +239,9 @@ export const stepProgram = (programText: string): void => {
   let currEditorLine = -1;
   try {
     const instructionIndex = registers[registerNames.indexOf("$pc")] / 4;
+    if (instructionIndex >= InstructionMemory.length){
+      return;
+    }
     const {editorLine, instr}: ParsedInstruction = InstructionMemory[instructionIndex];
     currEditorLine = editorLine;
     // retrieve the function's execution function (e.g. add => {rd = rs + rt})
