@@ -466,4 +466,17 @@ const getEffectiveAddress = (base: number, offset: number): number => {
     const effectiveAddress = base + offset;
     if (effectiveAddress < 0 || effectiveAddress > DATA_MEM_SIZE - 4) throw new Error(SEG_FAULT_ERROR);
     return effectiveAddress;
-}
+};
+
+export const instrToString = (instr: Instruction): string => {
+    let instrString = instr.name + " ";
+    const spec = InstructionSpec.get(instr.name);
+    if (spec === undefined) throw new Error('Error getting instruction spec while converting to log output string');
+    for (let i = 0; i < spec.fields.length; i++){
+        const field = spec.fields[i];
+        const fieldType = spec.types[i];
+        instrString += (fieldType === "Register") ? `${registerNames[instr[field]]}` : String(instr[field]);
+        if (i !== spec.fields.length - 1) instrString += ", "
+    }
+    return instrString;
+};

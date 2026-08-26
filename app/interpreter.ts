@@ -1,4 +1,4 @@
-import { type Instruction, InstructionSpec, MemoryInstructions } from "./instructions";
+import { type Instruction, InstructionSpec, MemoryInstructions, instrToString } from "./instructions";
 export const DATA_MEM_SIZE = 8_000_004; // (~8 MB)
 const MAX_ADDRESSABLE = 8_000_000;
 export let memoryViewAddress: number = 8_000_000;
@@ -51,28 +51,37 @@ export let DataMemory: Uint8Array = new Uint8Array(DATA_MEM_SIZE);
 let symtab: Map<string, number> = new Map<string, number>();
 
 // Program instructions
-let InstructionMemory: Instruction[] = [];
+type SourceLine = {
+  editorLine: number,
+  text: string
+}
+type ParsedInstruction = {
+  editorLine: number
+  instr: Instruction,
+}
+let InstructionMemory: ParsedInstruction[] = [];
 
 export let errorText: string = "";
 
-export const minify = (programLines: string[]): string[] => {
+export const minify = (programLines: string[]): SourceLine[] => {
   return programLines
-    .map(line => {
+    .map((line, index) => ({
+      editorLine: index + 1,
       // Remove trailing & leading whitespace, normalize whitespace, remove comments
-      return line.split("#")[0].trim().replace(/\s+/g, " ")
-    })
-    .filter(line => line !== "") // remove empty lines after removing whitespace/comments
+      text: line.split("#")[0].trim().replace(/\s+/g, " ")
+    }))
+    .filter(line => line.text !== "") // remove empty lines after removing whitespace/comments
 }
 
 // quickParse flag turns off errors in label names: intended to get labels for autocompletions
-export const parseLabels = (programLines: string[], labelStore: Map<string, number>, quickParse = false): string[] => {
+export const parseLabels = (programLines: SourceLine[], labelStore: Map<string, number>, quickParse = false): SourceLine[] => {
   let lineNumber = 0;
   const parsedProgramLines = programLines
     .map(line => {
       let colonIndex, label;
-      while ((colonIndex = line.indexOf(":")) !== -1){
+      while ((colonIndex = line.text.indexOf(":")) !== -1){
         // Remove leading whitespace before the label
-        label = line.slice(0, colonIndex).replace(/^\s+/, "");
+        label = line.text.slice(0, colonIndex).replace(/^\s+/, "");
         // Label validation
         const validateResponse = validateLabelName(label);
         if (typeof validateResponse === "string"){
@@ -83,12 +92,12 @@ export const parseLabels = (programLines: string[], labelStore: Map<string, numb
           labelStore.set(label, lineNumber * 4);
         }
         // Cut the label out of the line and repeat for other labels
-        line = line.slice(colonIndex + 1).trim();
+        line.text = line.text.slice(colonIndex + 1).trim();
       }
-      if (line !== "") lineNumber++;
+      if (line.text !== "") lineNumber++;
       return line;
     })
-    .filter(line => line !== "") // remove empty lines after removing labels
+    .filter(line => line.text !== "") // remove empty lines after removing labels
   return parsedProgramLines;
 }
 
@@ -157,37 +166,18 @@ export const lineToInstruction = (line: string): Instruction => {
   return instruction;
 }
 
-export const parse = (programText: string): Instruction[] => {
-  // stripping comments + trailing & leading whitespace
-  const programLines = parseLabels(minify(programText.split("\n")), symtab);
-  return programLines.map(line => lineToInstruction(line));
-}
-
-export const runProgram = (programText: string): void => {
-  resetProgram();
-  // clear the error output
-  const errorOutput: HTMLElement | null = (typeof document !== 'undefined') ? document.getElementById("errorOutput") : null;
-  try{
-    // parse the program text into a list of instructions
-    InstructionMemory = parse(programText);
-    // execute the program instructions
-    let instructionIndex: number;
-    while ((instructionIndex = registers[registerNames.indexOf("$pc")] / 4) < InstructionMemory.length){
-      const instr = InstructionMemory[instructionIndex];
-      // retrieve the function's execution function (e.g. add => {rd = rs + rt})
-      const instructionFunction = InstructionSpec.get(instr.name)!.func;
-      // run the function with operands
-      instructionFunction(instr);
-      // do not allow $zero to change value
-      registers[0] = 0;
-      // increment the program counter if the instruction didn't change it
-      if (instructionIndex === registers[registerNames.indexOf("$pc")] / 4){
-        registers[registerNames.indexOf("$pc")] += 4; 
-      }
-    };
-  } catch (error: unknown){
-    console.log("error detected");
-    resetProgram();
+export const parse = (programText: string): ParsedInstruction[] => {
+  const simulationTrace = document.getElementById("simulationTrace");
+  if (!simulationTrace) throw new Error("Couldn't get simulation trace in stepProgram func");
+  try {
+    // stripping comments + trailing & leading whitespace
+    const programLines = parseLabels(minify(programText.split("\n")), symtab);
+    const parsedInstructions = programLines.map(line => ({
+      editorLine: line.editorLine, instr: lineToInstruction(line.text)
+    }));
+    return parsedInstructions;
+  } catch (error: any){
+    console.log("Parsing Error", error);
     // catch the error and get its message
     if (error instanceof Error){
       errorText = error.message;
@@ -196,10 +186,61 @@ export const runProgram = (programText: string): void => {
     } else {
       console.log("Unknown/Unhandled Error: ", error);
       console.log("Unknown/Unhandled Error Type", typeof error);
-    }
-    // populate the errorOutput with the errorText
-    if (errorOutput) errorOutput.textContent = errorText;
+    } 
+    addErrorLog(simulationTrace, `${error}`);
   }
+  return [];
+}
+
+export const stepProgram = (programText: string): void => {
+  const simulationTrace = document.getElementById("simulationTrace");
+  if (!simulationTrace) throw new Error("Couldn't get simulation trace in stepProgram func");
+  // parse the program if it hasn't already been
+  if (programText && InstructionMemory.length === 0){
+    InstructionMemory = parse(programText);
+  }
+  // execute the next instruction
+  let currEditorLine = -1;
+  try {
+    const instructionIndex = registers[registerNames.indexOf("$pc")] / 4;
+    const {editorLine, instr}: ParsedInstruction = InstructionMemory[instructionIndex];
+    currEditorLine = editorLine;
+    // retrieve the function's execution function (e.g. add => {rd = rs + rt})
+    const instructionFunction = InstructionSpec.get(instr.name)!.func;
+    // run the function with operands
+    instructionFunction(instr);
+    // do not allow $zero to change value
+    registers[0] = 0;
+    // increment the program counter if the instruction didn't change it
+    if (instructionIndex === registers[registerNames.indexOf("$pc")] / 4){
+      registers[registerNames.indexOf("$pc")] += 4; 
+    }
+    // update log text
+    addLog(simulationTrace, `line ${currEditorLine} → ${instrToString(instr)}\n`);
+  } catch (error: unknown){ 
+    console.log("error detected");
+    // catch the error and get its message
+    if (error instanceof Error){
+      errorText = error.message;
+    } else if (typeof error === "string"){
+      errorText = error;
+    } else {
+      console.log("Unknown/Unhandled Error: ", error);
+      console.log("Unknown/Unhandled Error Type", typeof error);
+    } 
+    // populate the errorOutput with the errorText
+    addErrorLog(simulationTrace, `line ${currEditorLine} → ${errorText}`);
+  }
+}
+
+export const runProgram = (programText: string): void => {
+  resetProgram();
+  InstructionMemory = parse(programText);
+  // execute the program instructions
+  let instructionIndex: number;
+  while ((instructionIndex = registers[registerNames.indexOf("$pc")] / 4) < InstructionMemory.length){
+    stepProgram(programText);
+  };
 }
 
 export const resetProgram = (): void => {
@@ -215,11 +256,28 @@ export const resetProgram = (): void => {
   DataMemory = new Uint8Array(DATA_MEM_SIZE);
   // reset error text and output
   errorText = "";
+  // clear the simulation trace's logs
   if (typeof document !== 'undefined'){
-    const errorOutput: HTMLElement | null = document.getElementById("errorOutput");
-    if (errorOutput === null) return;
-    errorOutput.textContent = "";
+    const simulationTrace = document.getElementById("simulationTrace");
+    if (simulationTrace) simulationTrace.replaceChildren();
   }
+}
+
+const addLog = (simulationTrace: HTMLElement | null, logText: string) => {
+  if (!simulationTrace) throw new Error("Couldn't get simulationTrace")
+  const logLine = document.createElement("div");
+  logLine.textContent = logText
+  simulationTrace.appendChild(logLine);
+  simulationTrace.scrollTop = simulationTrace.scrollHeight;
+}
+
+const addErrorLog = (simulationTrace: HTMLElement | null, errorLogText: string): void => {
+  if (!simulationTrace) throw new Error("Couldn't get simulationTrace")
+  const errorLog = document.createElement("div");
+  errorLog.textContent = errorLogText;
+  errorLog.classList.add("text-red-500");
+  simulationTrace.appendChild(errorLog);
+  simulationTrace.scrollTop = simulationTrace.scrollHeight;
 }
 
 export const getRegisterOutput = (register: number, numberFormat: number): string => {

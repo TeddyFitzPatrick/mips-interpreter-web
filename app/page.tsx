@@ -3,8 +3,8 @@
 import { useEffect, useRef, type ChangeEvent} from 'react';
 import { EditorView, keymap, lineNumbers, gutter } from "@codemirror/view";
 import { defaultKeymap } from "@codemirror/commands";
-import { autocompletion, CompletionContext, Completion } from "@codemirror/autocomplete";
-import { registers, registerNames, updateMemoryViewAddress, updateMemoryView, updateRegisterDisplay, runProgram, resetProgram} from './interpreter';
+import { autocompletion } from "@codemirror/autocomplete";
+import { registers, registerNames, updateMemoryViewAddress, updateMemoryView, updateRegisterDisplay, runProgram, stepProgram, resetProgram} from './interpreter';
 import autocompletions from './autocomplete'; 
 import './globals.css'
 
@@ -78,7 +78,11 @@ function Buttons(){
       updateRegisterDisplay(numberFormat);
       updateMemoryView();
     }}/>
-    {/* <Button name="step" func={() => {return;}}/> */}
+    <Button name="step" func={() => {
+      stepProgram(textEditor.state.doc.toString());
+      updateRegisterDisplay(numberFormat);
+      updateMemoryView();
+    }}/>
     <Button name="reset" func={() => {
       resetProgram()
       updateRegisterDisplay(numberFormat);
@@ -172,9 +176,10 @@ export default function Page(){
       {/* Error Output */}
       <div className="bg-color3 w-full h-full rounded-xl shadow-xl p-4 space-y-2">
         <h1 className="font-bold text-xl">
-          Error Output
+          Simulation Trace
         </h1>
-        <textarea id="errorOutput" disabled className="resize-none w-full h-full text-red-500 rounded-lg p-2 text-red bg-color1 font-bold"></textarea>
+        <div className="w-full h-42 overflow-y-auto flex flex-col font-bold bg-color2 text-xl p-2" id="simulationTrace">
+        </div>
       </div>
     </div>
 
