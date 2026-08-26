@@ -1,7 +1,7 @@
 import { registerNames } from "./interpreter";
 import { CompletionContext, Completion, CompletionResult } from "@codemirror/autocomplete";
 import { InstructionCategory, InstructionSpec, InstructionSpecType, Operand, OperandType,  } from "./instructions";
-import { parseLabels, minify } from "./interpreter";
+import { sourceToInstructions, minify } from "./interpreter";
 
 export default function autocompletions(context: CompletionContext): CompletionResult {
   const line = context.state.doc.lineAt(context.pos);
@@ -14,7 +14,7 @@ export default function autocompletions(context: CompletionContext): CompletionR
   // console.log(`before: ${before} / currInstr: ${currentInstruction?.fields} / word: ${word}`)
   const programText = context.state.doc.toString();
   const symtab = new Map<string, number>([]);
-  parseLabels(minify(programText.split("\n")), symtab, true);
+  sourceToInstructions(minify(programText.split("\n")), symtab, true);
   const labels = symtab.keys() 
 
   // Don't show autocompletion options
@@ -33,7 +33,7 @@ export default function autocompletions(context: CompletionContext): CompletionR
       : `${registerNames[i]}\n`
     }
     registerAutocompletes.push(registerAutocomplete)
-  }
+  };
 
   // instruction name autocompletes
   const instrAutocompletes: Completion[] = [];

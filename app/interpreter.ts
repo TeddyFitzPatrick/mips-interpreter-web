@@ -1,4 +1,4 @@
-import { type Instruction, InstructionSpec, MemoryInstructions, instrToString } from "./instructions";
+import { type Instruction, InstructionSpec, MemoryInstructions, expandPseudoInstruction, instrToString } from "./instructions";
 export const DATA_MEM_SIZE = 8_000_004; // (~8 MB)
 const MAX_ADDRESSABLE = 8_000_000;
 export let memoryViewAddress: number = 8_000_000;
@@ -49,6 +49,10 @@ export let DataMemory: Uint8Array = new Uint8Array(DATA_MEM_SIZE);
 
 // Symbol table
 let symtab: Map<string, number> = new Map<string, number>();
+type UnresolvedAddress = {
+  label: string,
+  lineIndex: number
+}
 
 // Program instructions
 type SourceLine = {
@@ -73,35 +77,61 @@ export const minify = (programLines: string[]): SourceLine[] => {
     .filter(line => line.text !== "") // remove empty lines after removing whitespace/comments
 }
 
-// quickParse flag turns off errors in label names: intended to get labels for autocompletions
-export const parseLabels = (programLines: SourceLine[], labelStore: Map<string, number>, quickParse = false): SourceLine[] => {
+// quickParse to quickly gather label names for autocomplete suggestins
+export const sourceToInstructions = (programLines: SourceLine[], labelStore: Map<string, number>, quickParse = false): ParsedInstruction[] => {
   let lineNumber = 0;
-  const parsedProgramLines = programLines
-    .map(line => {
-      let colonIndex, label;
-      while ((colonIndex = line.text.indexOf(":")) !== -1){
-        // Remove leading whitespace before the label
-        label = line.text.slice(0, colonIndex).replace(/^\s+/, "");
-        // Label validation
-        const validateResponse = validateLabelName(label);
-        if (typeof validateResponse === "string"){
-          if (!quickParse) throw new Error (validateResponse);
-        }
-        else {
-          // Add the label to the symtab
-          labelStore.set(label, lineNumber * 4);
-        }
-        // Cut the label out of the line and repeat for other labels
-        line.text = line.text.slice(colonIndex + 1).trim();
+  const parsedInstructions: ParsedInstruction[] = [];
+  const unresolvedAddresses: UnresolvedAddress[] = [];
+  // PASS 1: populate symtab, expand pseudos, and generate partial instructions (with unresolved addresses) 
+  programLines.forEach(line => {
+    let colonIndex, label;
+    // store the labels of a line and strip whitespace until only the empty string or an instruction remains
+    while ((colonIndex = line.text.indexOf(":")) !== -1){
+      // Remove leading whitespace before the label
+      label = line.text.slice(0, colonIndex).replace(/^\s+/, "");
+      // Label validation
+      const validateResponse = validateLabelName(label);
+      if (typeof validateResponse === "string"){
+        if (!quickParse) throw new Error (validateResponse);
       }
-      if (line.text !== "") lineNumber++;
-      return line;
-    })
-    .filter(line => line.text !== "") // remove empty lines after removing labels
-  return parsedProgramLines;
+      else {
+        // Add the label to the symtab
+        labelStore.set(label, lineNumber * 4);
+      }
+      // Cut the label out of the line and repeat for other labels
+      line.text = line.text.slice(colonIndex + 1).trim();
+    }
+    // line.text is now either an empty string, invalid instruction, or valid instruction
+    if (line.text !== "" && !quickParse) {
+      const instruction: Instruction = lineToInstruction(line.text, lineNumber, unresolvedAddresses);
+      const spec = InstructionSpec.get(instruction.name);
+      // expand pseudo instructions into native instruction(s)
+      const lineInstructions: ParsedInstruction[] = [];
+      if (spec?.category === "pseudo") {
+        const nativeInstructions = expandPseudoInstruction(instruction);
+        nativeInstructions.forEach((instruction: Instruction) => lineInstructions.push({editorLine: line.editorLine, instr: instruction}));
+      } else {
+        lineInstructions.push({editorLine: line.editorLine, instr: instruction});  
+      }
+      // advance the address of the next instruction based on the instruction's expansion
+      lineNumber += lineInstructions.length;
+      lineInstructions.forEach((lineInstruction: ParsedInstruction) => parsedInstructions.push(lineInstruction))
+    };
+  });
+  // PASS 2: resolve unresolved addresses using the populated symtab
+  unresolvedAddresses.forEach(({label, lineIndex}: UnresolvedAddress) => {
+    if (!symtab.has(label)) throw new Error(`Could not find label ${label}`);
+    const labelAddress = symtab.get(label);
+    if (!labelAddress) throw new Error(`Illegal label address ${labelAddress} for label ${label}`);
+    const unresolvedInstr: Instruction = parsedInstructions[lineIndex].instr;
+    // assigns the label's address to the target and imm fields, because the instruction could be an I or J type
+    unresolvedInstr.target = labelAddress; 
+    unresolvedInstr.imm = labelAddress;
+  });
+  return parsedInstructions;
 }
 
-export const lineToInstruction = (line: string): Instruction => {
+export const lineToInstruction = (line: string, lineNumber: number, unresolvedAddresses: UnresolvedAddress[]): Instruction => {
   // Separate each line into an instruction name and its arguments ("addi" + "$t0, $t0, 1")
   const firstSpaceIndex = line.indexOf(" ");
   if (firstSpaceIndex === -1) throw new Error(`Invalid syntax, instruction is missing a space`)
@@ -109,7 +139,7 @@ export const lineToInstruction = (line: string): Instruction => {
   // Get the instruction's operands (e.g. addi => ["rs", "rt", "imm"])
   const instructionSpec = InstructionSpec.get(instructionName);
   let lineArguments = line.slice(firstSpaceIndex).replace(/\s+/g, "").split(",").filter(arg => arg !== "");
-  if (instructionSpec === undefined) throw new Error(`Instruction ${instructionName} not found`);
+  if (!instructionSpec) throw new Error(`Instruction ${instructionName} not found`);
   // Handle the special syntax of memory instructions i.e. rt, imm(rs) 
   if (MemoryInstructions.indexOf(instructionName) !== -1){
     if (lineArguments.length !== 2) throw new Error(`Invalid argument count for ${instructionName} instruction`)
@@ -159,8 +189,10 @@ export const lineToInstruction = (line: string): Instruction => {
       if (!isShiftAmount(lineArgument)) throw new Error(`Invalid ShiftAmount argument ${lineArgument}`);
       instruction[field] = +lineArgument;
     } else if (operandType === "Label") {
-      if (!isLabel(lineArgument)) throw new Error(`Invalid Label argument ${lineArgument}`);
-      instruction[field] = symtab.get(lineArgument)!;
+      if (!symtab.has(lineArgument)) {
+        unresolvedAddresses.push({label: lineArgument, lineIndex: lineNumber});
+        instruction[field] = 0;  // leave the label's address blank to be resolved in the next parsing pass
+      } else instruction[field] = symtab.get(lineArgument)!;
     }
   }
   return instruction;
@@ -171,13 +203,15 @@ export const parse = (programText: string): ParsedInstruction[] => {
   if (!simulationTrace) throw new Error("Couldn't get simulation trace in stepProgram func");
   try {
     // stripping comments + trailing & leading whitespace
-    const programLines = parseLabels(minify(programText.split("\n")), symtab);
-    const parsedInstructions = programLines.map(line => ({
-      editorLine: line.editorLine, instr: lineToInstruction(line.text)
-    }));
+    const strippedSourceLines = minify(programText.split("\n"));
+    const parsedInstructions = sourceToInstructions(strippedSourceLines, symtab);
+
+    console.log("symtab::");
+    console.dir(symtab);
+
     return parsedInstructions;
   } catch (error: any){
-    console.log("Parsing Error", error);
+    console.log("Parsing Error: ", error);
     // catch the error and get its message
     if (error instanceof Error){
       errorText = error.message;
@@ -193,12 +227,14 @@ export const parse = (programText: string): ParsedInstruction[] => {
 }
 
 export const stepProgram = (programText: string): void => {
+  if (errorText) return;
   const simulationTrace = document.getElementById("simulationTrace");
   if (!simulationTrace) throw new Error("Couldn't get simulation trace in stepProgram func");
   // parse the program if it hasn't already been
   if (programText && InstructionMemory.length === 0){
     InstructionMemory = parse(programText);
   }
+  if (InstructionMemory.length === 0) return;
   // execute the next instruction
   let currEditorLine = -1;
   try {
@@ -334,37 +370,33 @@ const isRegister = (text: string): boolean => {
   return false
 }
 
-const isUImm16 = (text: string): boolean => {
+export const isUImm16 = (text: string): boolean => {
   if (!isNumeric(text)) return false;
-  return 0 <= +text && +text <= Math.pow(2,16) - 1;
+  return 0 <= +text && +text <= Math.pow(2, 16) - 1;
 }
 
-const isImm16 = (text: string): boolean => {
+export const isImm16 = (text: string): boolean => {
+  console.log("text", text)
+  console.log("numeric", +text);
   if (!isNumeric(text)) return false;
-  return -Math.pow(2,15) <= +text && +text <= Math.pow(2,15) - 1;
+  return -Math.pow(2, 15) <= +text && +text <= Math.pow(2, 15) - 1;
 }
 
-const isUImm32 = (text: string): boolean => {
+export const isUImm32 = (text: string): boolean => {
   if (!isNumeric(text)) return false;
-  return 0 <= +text && +text <= Math.pow(2,32) - 1;
+  return 0 <= +text && +text <= Math.pow(2, 32) - 1;
 }
 
-const isImm32 = (text: string): boolean => {
+export const isImm32 = (text: string): boolean => {
   if (!isNumeric(text)) return false;
-  return -Math.pow(2,31) <= +text && +text <= Math.pow(2,31) - 1;
+  return -Math.pow(2, 31) <= +text && +text <= Math.pow(2, 31) - 1;
 }
 
-const isShiftAmount = (text: string): boolean => {
+export const isShiftAmount = (text: string): boolean => {
   if (!isNumeric(text)) return false;
-  return 0 <= +text && +text <= Math.pow(2,5) - 1;
+  return 0 <= +text && +text <= Math.pow(2, 5) - 1;
 }
 
-/**
- * Returns true if a label (string) is found in the symbol table 
- */
-const isLabel = (text: string): boolean => {
-  return symtab.has(text);
-}
 
 /**
  * Returns true if a string represents a finite number 

@@ -1,6 +1,6 @@
-import { registers, registerNames, DataMemory, DATA_MEM_SIZE } from "./interpreter";
+import { registers, registerNames, DataMemory, DATA_MEM_SIZE, isImm16 } from "./interpreter";
 
-// error message
+// error messages
 export const UNALIGNED_MEM_ACC_ERROR = 'Address Error (Unaligned Memory Access)';
 export const SEG_FAULT_ERROR = 'Segmentation Fault (Out-of-bounds Memory Access)';
 
@@ -12,18 +12,18 @@ export type Instruction = {
   shamt: number,   // shift amount               (5-bits)
   imm: number,     // imm/addr of an I-type      (16-bits)
   target: number   // 26-bit J-type addr         (26-bits)
-}
+};
 
 export const MemoryInstructions: string[] = [
     "lb",
-    "lbu",
+    "lbu", 
     "lh",
     "lhu",
     "lw",
     "sb",
     "sh",
     "sw"
-]
+];
 
 export type Operand = keyof Omit<Instruction, "name">;
 
@@ -393,74 +393,94 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
         category: 'native'
     }],
     // Pseudos
-    ["bge", {
-        func: (instr: Instruction): void => {
-            const rs = registers[instr.rs] | 0;
-            const rt = registers[instr.rt] | 0;
-            registers[registerNames.indexOf('$at')] = (rs < rt) ? 1 : 0;
-            if (registers[registerNames.indexOf('$at')] === registers[registerNames.indexOf('$zero')]) {
-                registers[registerNames.indexOf("$pc")] = instr.imm;
-            }
-        },
-        fields: ["rs", "rt", "imm"],
-        types: ["Register", "Register", "Label"],
-        category: 'pseudo'
-    }],
-    ["ble", {
-        func: (instr: Instruction): void => {
-            const rs = registers[instr.rs] | 0;
-            const rt = registers[instr.rt] | 0;
-            registers[registerNames.indexOf('$at')] = (rt < rs) ? 1 : 0;
-            if (registers[registerNames.indexOf('$at')] === registers[registerNames.indexOf('$zero')]) {
-                registers[registerNames.indexOf("$pc")] = instr.imm;
-            }
-        },
-        fields: ["rs", "rt", "imm"],
-        types: ["Register", "Register", "Label"],
-        category: 'pseudo'
-    }],
-    ["jalr", {
-        func: (instr: Instruction): void => {
-            registers[registerNames.indexOf("$ra")] = registers[registerNames.indexOf("$pc")] + 4;
-            registers[registerNames.indexOf("$pc")] = registers[instr.rs];
-        },
-        fields: ["rs"],
-        types: ["Register"],
-        category: 'pseudo'
-    }],
+    // ["bge", {
+    //     func: (instr: Instruction): void => {
+    //         const rs = registers[instr.rs] | 0;
+    //         const rt = registers[instr.rt] | 0;
+    //         registers[registerNames.indexOf('$at')] = (rs < rt) ? 1 : 0;
+    //         if (registers[registerNames.indexOf('$at')] === registers[registerNames.indexOf('$zero')]) {
+    //             registers[registerNames.indexOf("$pc")] = instr.imm;
+    //         }
+    //     },
+    //     fields: ["rs", "rt", "imm"],
+    //     types: ["Register", "Register", "Label"],
+    //     category: 'pseudo'
+    // }],
+    // ["ble", {
+    //     func: (instr: Instruction): void => {
+    //         const rs = registers[instr.rs] | 0;
+    //         const rt = registers[instr.rt] | 0;
+    //         registers[registerNames.indexOf('$at')] = (rt < rs) ? 1 : 0;
+    //         if (registers[registerNames.indexOf('$at')] === registers[registerNames.indexOf('$zero')]) {
+    //             registers[registerNames.indexOf("$pc")] = instr.imm;
+    //         }
+    //     },
+    //     fields: ["rs", "rt", "imm"],
+    //     types: ["Register", "Register", "Label"],
+    //     category: 'pseudo'
+    // }],
+    // ["jalr", {
+    //     func: (instr: Instruction): void => {
+    //         registers[registerNames.indexOf("$ra")] = registers[registerNames.indexOf("$pc")] + 4;
+    //         registers[registerNames.indexOf("$pc")] = registers[instr.rs];
+    //     },
+    //     fields: ["rs"],
+    //     types: ["Register"],
+    //     category: 'pseudo'
+    // }],
     ["li", {
         func: (instr: Instruction): void => {
             registers[instr.rs] = instr.imm;
         },
-        fields: ["rs", "imm"],
+        fields: ["rt", "imm"],
         types: ["Register", "UImm32"],
         category: 'pseudo'
     }],
-    ["la", {
-        func: (instr: Instruction): void => {
-            registers[instr.rs] = instr.imm;
-        },
-        fields: ["rs", "imm"],
-        types: ["Register", "Label"],
-        category: 'pseudo'
-    }],
-    ["move", {
-        func: (instr: Instruction): void => {
-            registers[instr.rd] = registers[instr.rs];
-        },
-        fields: ["rd", "rs"],
-        types: ["Register", "Register"],
-        category: 'pseudo'
-    }],
-    ["mul", {
-        func: (instr: Instruction): void => {
-            registers[instr.rd] = registers[instr.rs] * registers[instr.rt];
-        },
-        fields: ["rd", "rs", "rt"],
-        types: ["Register", "Register", "Register"],
-        category: 'pseudo'
-    }]
+    // ["la", {
+    //     func: (instr: Instruction): void => {
+    //         registers[instr.rs] = instr.imm;
+    //     },
+    //     fields: ["rs", "imm"],
+    //     types: ["Register", "Label"],
+    //     category: 'pseudo'
+    // }],
+    // ["move", {
+    //     func: (instr: Instruction): void => {
+    //         registers[instr.rd] = registers[instr.rs];
+    //     },
+    //     fields: ["rd", "rs"],
+    //     types: ["Register", "Register"],
+    //     category: 'pseudo'
+    // }],
+    // ["mul", {
+    //     func: (instr: Instruction): void => {
+    //         registers[instr.rd] = registers[instr.rs] * registers[instr.rt];
+    //     },
+    //     fields: ["rd", "rs", "rt"],
+    //     types: ["Register", "Register", "Register"],
+    //     category: 'pseudo'
+    // }]
 ]);
+
+export const expandPseudoInstruction = (pseudoInstruction: Instruction): Instruction[] => {
+    const spec = InstructionSpec.get(pseudoInstruction.name);
+    if (!spec) throw new Error(`Pseudo expansion failed because pseudo-instruction ${pseudoInstruction.name} doesn't exist`);
+    if (spec.category !== "pseudo") throw new Error('Native instruction was passed to expandPseudoInstruction');
+    const nativeInstructions: Instruction[] = [];
+
+    switch (pseudoInstruction.name){
+        case "li":
+            const immediateValue = pseudoInstruction.imm;
+            if (isImm16(`${immediateValue}`)){
+                nativeInstructions.push({name: "addiu", rt: pseudoInstruction.rt, rs: 0, imm: immediateValue, rd: -1, shamt: -1, target: -1});
+            } else {
+                nativeInstructions.push({name: "lui", rt: pseudoInstruction.rt, imm: (immediateValue >>> 16), rs: -1, rd: -1, shamt: -1, target: -1});
+                nativeInstructions.push({name: "ori", rt: pseudoInstruction.rt, rs: pseudoInstruction.rt, imm: immediateValue & 0xFFFF, rd: -1, shamt: -1, target: -1});
+            }
+            break;
+    }
+    return nativeInstructions;
+}
 
 const getEffectiveAddress = (base: number, offset: number): number => {
     const effectiveAddress = base + offset;
