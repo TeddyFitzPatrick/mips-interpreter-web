@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, type ChangeEvent} from 'react';
 import { EditorView, keymap, lineNumbers, gutter } from "@codemirror/view";
-import { defaultKeymap } from "@codemirror/commands";
+import { defaultKeymap, history, historyKeymap} from "@codemirror/commands";
 import { autocompletion } from "@codemirror/autocomplete";
 import { registers, registerNames, updateMemoryViewAddress, updateMemoryView, updateRegisterDisplay, runProgram, stepProgram, resetProgram} from './interpreter';
 import autocompletions from './autocomplete'; 
@@ -45,6 +45,8 @@ function Editor(){
       doc: editorCode,
       extensions: [
         autocompletion({ override: [autocompletions] }),
+        history(),
+        keymap.of(historyKeymap),
         keymap.of(defaultKeymap),
         lineNumbers(),
         gutter({class: "cm-mygutter"}),

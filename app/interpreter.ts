@@ -226,10 +226,13 @@ export const parse = (programText: string): ParsedInstruction[] => {
   return [];
 }
 
-export const stepProgram = (programText: string): void => {
+export const stepProgram = async (programText: string): Promise<void> => {
   if (errorText) return;
   const simulationTrace = document.getElementById("simulationTrace");
   if (!simulationTrace) throw new Error("Couldn't get simulation trace in stepProgram func");
+
+  await new Promise(resolve => setTimeout(resolve, 1000 * (1 / 64)));
+
   // parse the program if it hasn't already been
   if (programText && InstructionMemory.length === 0){
     InstructionMemory = parse(programText);
@@ -272,13 +275,15 @@ export const stepProgram = (programText: string): void => {
   }
 }
 
-export const runProgram = (programText: string): void => {
+export const runProgram = async (programText: string): Promise<void> => {
   resetProgram();
   InstructionMemory = parse(programText);
   // execute the program instructions
   let instructionIndex: number;
   while ((instructionIndex = registers[registerNames.indexOf("$pc")] / 4) < InstructionMemory.length){
-    stepProgram(programText);
+    await stepProgram(programText);
+
+    if (errorText) break;
   };
 }
 
