@@ -65,6 +65,7 @@ type ParsedInstruction = {
 }
 let InstructionMemory: ParsedInstruction[] = [];
 
+let running = false;
 export let errorText: string = "";
 
 export const minify = (programLines: string[]): SourceLine[] => {
@@ -226,7 +227,7 @@ export const parse = (programText: string): ParsedInstruction[] => {
   return [];
 }
 
-export const stepProgram = async (programText: string): Promise<void> => {
+export const stepProgram = async (programText: string, continuousExecution = false): Promise<void> => {
   if (errorText) return;
   const simulationTrace = document.getElementById("simulationTrace");
   if (!simulationTrace) throw new Error("Couldn't get simulation trace in stepProgram func");
@@ -240,6 +241,7 @@ export const stepProgram = async (programText: string): Promise<void> => {
   if (InstructionMemory.length === 0) return;
   // execute the next instruction
   let currEditorLine = -1;
+  if (!running && continuousExecution) return;
   try {
     const instructionIndex = registers[registerNames.indexOf("$pc")] / 4;
     if (instructionIndex >= InstructionMemory.length){
@@ -279,15 +281,16 @@ export const runProgram = async (programText: string): Promise<void> => {
   resetProgram();
   InstructionMemory = parse(programText);
   // execute the program instructions
+  running = true;
   let instructionIndex: number;
-  while ((instructionIndex = registers[registerNames.indexOf("$pc")] / 4) < InstructionMemory.length){
-    await stepProgram(programText);
-
+  while (running && (instructionIndex = registers[registerNames.indexOf("$pc")] / 4) < InstructionMemory.length){
+    await stepProgram(programText, true);
     if (errorText) break;
   };
 }
 
 export const resetProgram = (): void => {
+  running = false;
   // reset registers to 0
   registers.forEach((_value, index) => {
     registers[index] = (index === registerNames.indexOf("$sp")) ? MAX_ADDRESSABLE : 0;

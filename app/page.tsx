@@ -4,6 +4,10 @@ import { useEffect, useRef, type ChangeEvent} from 'react';
 import { EditorView, keymap, lineNumbers, gutter } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap} from "@codemirror/commands";
 import { autocompletion } from "@codemirror/autocomplete";
+
+import { HighlightStyle, syntaxHighlighting } from "@codemirror/language"
+import { tags } from "@lezer/highlight"
+
 import { registers, registerNames, updateMemoryViewAddress, updateMemoryView, updateRegisterDisplay, runProgram, stepProgram, resetProgram} from './interpreter';
 import autocompletions from './autocomplete'; 
 import './globals.css'
@@ -36,6 +40,16 @@ lw $s0, 0($sp)
 addi $sp, $sp, 4
 `;
 
+const myCustomHighlightStyle = HighlightStyle.define([
+  { tag: tags.keyword, color: "#ff79c6", fontWeight: "bold" },
+  { tag: tags.comment, color: "#6272a4", fontStyle: "italic" },
+  { tag: tags.string, color: "#f1fa8c" },
+  { tag: tags.number, color: "#bd93f9" },
+  { tag: tags.variableName, color: "#f8f8f2" },
+  { tag: tags.operator, color: "#ffb86c" }
+])
+export const customHighlightExtension = syntaxHighlighting(myCustomHighlightStyle);
+
 function Editor(){
   const editorRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
@@ -45,6 +59,7 @@ function Editor(){
       doc: editorCode,
       extensions: [
         autocompletion({ override: [autocompletions] }),
+        customHighlightExtension,
         history(),
         keymap.of(historyKeymap),
         keymap.of(defaultKeymap),
@@ -168,7 +183,7 @@ function MemoryView(){
 export default function Page(){
   return <>
   <html>
-  <body className="flex flex-col sm:flex-row space-y-6 sm:space-y-0 w-full max-w-screen min-h-screen h-fit bg-color4 p-4 space-x-4 text-slate-800">
+  <body className="flex flex-col sm:flex-row space-y-6 sm:space-y-0 w-full max-w-screen min-h-screen h-fit bg-color4 p-4 space-x-4 text-slate-800 font-mono">
     <div className="w-full sm:w-1/2 h-full flex flex-col space-y-4">
       {/* Editor  */}
       <div className="flex flex-col w-full h-full rounded-xl bg-color3 p-4 shadow-xl">
