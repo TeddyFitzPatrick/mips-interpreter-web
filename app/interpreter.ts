@@ -108,7 +108,7 @@ export const sourceToInstructions = (programLines: SourceLine[], labelStore: Map
       const spec = InstructionSpec.get(instruction.name);
       // expand pseudo instructions into native instruction(s)
       const lineInstructions: ParsedInstruction[] = [];
-      if (spec?.category === "pseudo") {
+      if (spec?.pseudo) {
         const nativeInstructions = expandPseudoInstruction(instruction);
         nativeInstructions.forEach((instruction: Instruction) => lineInstructions.push({editorLine: line.editorLine, instr: instruction}));
       } else {
@@ -247,18 +247,16 @@ export const stepProgram = async (programText: string, continuousExecution = fal
     if (instructionIndex >= InstructionMemory.length){
       return;
     }
+    // fetch the instruction
     const {editorLine, instr}: ParsedInstruction = InstructionMemory[instructionIndex];
     currEditorLine = editorLine;
-    // retrieve the function's execution function (e.g. add => {rd = rs + rt})
-    const instructionFunction = InstructionSpec.get(instr.name)!.func;
+    // increment the pc
+    registers[registerNames.indexOf("$pc")] += 4; 
     // run the function with operands
+    const instructionFunction = InstructionSpec.get(instr.name)!.func;
     instructionFunction(instr);
     // do not allow $zero to change value
     registers[0] = 0;
-    // increment the program counter if the instruction didn't change it
-    if (instructionIndex === registers[registerNames.indexOf("$pc")] / 4){
-      registers[registerNames.indexOf("$pc")] += 4; 
-    }
     // update log text
     addLog(simulationTrace, `line ${currEditorLine} → ${instrToString(instr)}\n`);
   } catch (error: unknown){ 
@@ -285,6 +283,7 @@ export const runProgram = async (programText: string): Promise<void> => {
   let instructionIndex: number;
   while (running && (instructionIndex = registers[registerNames.indexOf("$pc")] / 4) < InstructionMemory.length){
     await stepProgram(programText, true);
+
     if (errorText) break;
   };
 }
@@ -387,8 +386,6 @@ export const isUImm16 = (text: string): boolean => {
 }
 
 export const isImm16 = (text: string): boolean => {
-  console.log("text", text)
-  console.log("numeric", +text);
   if (!isNumeric(text)) return false;
   return -Math.pow(2, 15) <= +text && +text <= Math.pow(2, 15) - 1;
 }

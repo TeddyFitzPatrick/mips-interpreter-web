@@ -38,15 +38,12 @@ export type OperandType =
 
 export type InstructionFunction = (instr: Instruction) => void;
 
-export type InstructionCategory = 
-    | 'native'
-    | 'pseudo';
-
 export type InstructionSpecType = {
     func: InstructionFunction,
     fields: Operand[],
     types: OperandType[],
-    category: InstructionCategory
+    pseudo: boolean,
+
 };
 
 export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
@@ -56,7 +53,8 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
         },
         fields: ["rd", "rs", "rt"],
         types: ["Register", "Register", "Register"],
-        category: 'native'
+        pseudo: false,
+
     }],
     ["addu", {
         func: (instr: Instruction): void => {
@@ -64,7 +62,7 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
         },
         fields: ["rd", "rs", "rt"],
         types: ["Register", "Register", "Register"],
-        category: 'native'
+        pseudo: false
     }],
     ["addiu", {
         func: (instr: Instruction): void => {
@@ -72,7 +70,7 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
         },
         fields: ["rt", "rs", "imm"],
         types: ["Register", "Register", "Imm16"],
-        category: 'native'
+        pseudo: false
     }],
     ["sub", {
         func: (instr: Instruction): void => {
@@ -80,7 +78,7 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
         },
         fields: ["rd", "rs", "rt"],
         types: ["Register", "Register", "Register"],
-        category: 'native'
+        pseudo: false
     }],
     ["and", {
         func: (instr: Instruction): void => {
@@ -88,7 +86,7 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
         },
         fields: ["rd", "rs", "rt"],
         types: ["Register", "Register", "Register"],
-        category: 'native'
+        pseudo: false
     }],
     ["or", {
         func: (instr: Instruction): void => {
@@ -96,7 +94,7 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
         },
         fields: ["rd", "rs", "rt"],
         types: ["Register", "Register", "Register"],
-        category: 'native'
+        pseudo: false
     }],
     ["xor", {
         func: (instr: Instruction): void => {
@@ -104,7 +102,7 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
         },
         fields: ["rd", "rs", "rt"],
         types: ["Register", "Register", "Register"],
-        category: 'native'
+        pseudo: false
     }],
     ["nop", {
         func: (instr: Instruction): void => {
@@ -112,7 +110,7 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
         },
         fields: [],
         types: [],
-        category: 'native'
+        pseudo: false
     }],
     ["nor", {
         func: (instr: Instruction): void => {
@@ -120,7 +118,7 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
         },
         fields: ["rd", "rs", "rt"],
         types: ["Register", "Register", "Register"],
-        category: 'native'
+        pseudo: false
     }],
     ["slt", {
         func: (instr: Instruction): void => {
@@ -130,7 +128,7 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
         },
         fields: ["rd", "rs", "rt"],
         types: ["Register", "Register", "Register"],
-        category: 'native'
+        pseudo: false
     }],
     ["slti", {
         func: (instr: Instruction): void => {
@@ -140,7 +138,7 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
         },
         fields: ["rt", "rs", "imm"],
         types: ["Register", "Register", "Imm16"],
-        category: 'native'
+        pseudo: false
     }],
     ["sltu", {
         func: (instr: Instruction): void => {
@@ -148,7 +146,7 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
         },
         fields: ["rd", "rs", "rt"],
         types: ["Register", "Register", "Register"],
-        category: 'native'
+        pseudo: false
     }],
     ["sltiu", {
         func: (instr: Instruction): void => {
@@ -158,7 +156,7 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
         },
         fields: ["rt", "rs", "imm"],
         types: ["Register", "Register", "Imm16"],
-        category: 'native'
+        pseudo: false
     }],
     ["sll", {
         func: (instr: Instruction): void => {
@@ -166,7 +164,7 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
         },
         fields: ["rd", "rt", "shamt"],
         types: ["Register", "Register", "ShiftAmount"],
-        category: 'native'
+        pseudo: false
     }],
     ["srl", {
         func: (instr: Instruction): void => {
@@ -174,7 +172,7 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
             },
         fields: ["rd", "rt", "shamt"],
         types: ["Register", "Register", "ShiftAmount"],
-        category: 'native'
+        pseudo: false
     }],
     ["sra", {
         func: (instr: Instruction): void => {
@@ -182,7 +180,7 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
         },
         fields: ["rd", "rt", "shamt"],
         types: ["Register", "Register", "ShiftAmount"],
-        category: 'native'
+        pseudo: false
     }],
     ["sllv", {
         func: (instr: Instruction): void => {
@@ -190,7 +188,7 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
         },
         fields: ["rd", "rt", "rs"],
         types: ["Register", "Register", "Register"],
-        category: 'native'
+        pseudo: false
     }],
     ["srlv", {
         func: (instr: Instruction): void => {
@@ -198,7 +196,7 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
         },
         fields: ["rd", "rt", "rs"],
         types: ["Register", "Register", "Register"],
-        category: 'native'
+        pseudo: false
     }],
     ["srav", {
         func: (instr: Instruction): void => {
@@ -206,7 +204,7 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
         },
         fields: ["rd", "rt", "rs"],
         types: ["Register", "Register", "Register"],
-        category: 'native'
+        pseudo: false
     }],
     ["mult", {
         func: (instr: Instruction): void => {
@@ -219,7 +217,7 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
         },
         fields: ["rs", "rt"],
         types: ["Register", "Register"],
-        category: 'native'
+        pseudo: false
     }],
     ["div", {
         func: (instr: Instruction): void => {
@@ -228,7 +226,7 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
         },
         fields: ["rs", "rt"],
         types: ["Register", "Register"],
-        category: 'native'
+        pseudo: false
     }],
     ["mfhi", {
         func: (instr: Instruction): void => {
@@ -236,7 +234,7 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
         },
         fields: ["rd"],
         types: ["Register"],
-        category: 'native'
+        pseudo: false
     }],
     ["mflo", {
         func: (instr: Instruction): void => {
@@ -244,7 +242,7 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
         },
         fields: ["rd"],
         types: ["Register"],
-        category: 'native'
+        pseudo: false
     }],
     ["addi", {
         func: (instr: Instruction): void => {
@@ -252,7 +250,7 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
         },
         fields: ["rt", "rs", "imm"],
         types: ["Register", "Register", "Imm16"],
-        category: 'native'
+        pseudo: false
     }],
     ["andi", {
         func: (instr: Instruction): void => {
@@ -260,7 +258,7 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
         },
         fields: ["rt", "rs", "imm"],
         types: ["Register", "Register", "UImm16"],
-        category: 'native'
+        pseudo: false
     }],
     ["ori", {
         func: (instr: Instruction): void => {
@@ -268,7 +266,7 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
         },
         fields: ["rt", "rs", "imm"],
         types: ["Register", "Register", "UImm16"],
-        category: 'native'
+        pseudo: false
     }],
     ["xori", {
         func: (instr: Instruction): void => {
@@ -276,7 +274,7 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
         },
         fields: ["rt", "rs", "imm"],
         types: ["Register", "Register", "UImm16"],
-        category: 'native'
+        pseudo: false
     }],
     ["slti", {
         func: (instr: Instruction): void => {
@@ -284,7 +282,7 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
         },
         fields: ["rt", "rs", "imm"],
         types: ["Register", "Register", "Imm16"],
-        category: 'native'
+        pseudo: false
     }],
     ["lui", {
         func: (instr: Instruction): void => {
@@ -292,7 +290,7 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
         },
         fields: ["rt", "imm"],
         types: ["Register", "UImm16"],
-        category: 'native'
+        pseudo: false
     }],
     ["lb", {
         func: (instr: Instruction): void => {
@@ -302,7 +300,7 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
         },
         fields: ["rt", "imm", "rs"],
         types: ["Register", "Imm16", "Register"],
-        category: 'native'
+        pseudo: false
     }],
     ["lbu", {
         func: (instr: Instruction): void => {
@@ -311,7 +309,7 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
         },
         fields: ["rt", "imm", "rs"],
         types: ["Register", "Imm16", "Register"],
-        category: 'native'
+        pseudo: false
     }],
     ["lh", {
         func: (instr: Instruction): void => {
@@ -323,7 +321,7 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
         },
         fields: ["rt", "imm", "rs"],
         types: ["Register", "Imm16", "Register"],
-        category: 'native'
+        pseudo: false
     }],
     ["lhu", {
         func: (instr: Instruction): void => {
@@ -334,7 +332,7 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
         },
         fields: ["rt", "imm", "rs"],
         types: ["Register", "Imm16", "Register"],
-        category: 'native'
+        pseudo: false
     }],
     ["lw", {
         func: (instr: Instruction): void => {            
@@ -348,7 +346,7 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
         },
         fields: ["rt", "imm", "rs"],
         types: ["Register", "Imm16", "Register"],
-        category: 'native'
+        pseudo: false
     }],
     ["sb", {
         func: (instr: Instruction): void => {
@@ -357,7 +355,7 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
         },
         fields: ["rt", "imm", "rs"],
         types: ["Register", "Imm16", "Register"],
-        category: 'native'
+        pseudo: false
     }],
     ["sh", {
         func: (instr: Instruction): void => {
@@ -368,7 +366,7 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
         }, 
         fields: ["rt", "imm", "rs"],
         types: ["Register", "Imm16", "Register"],
-        category: 'native'
+        pseudo: false
     }],
     ["sw", {
         func: (instr: Instruction): void => {
@@ -383,7 +381,7 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
         },
         fields: ["rt", "imm", "rs"],
         types: ["Register", "Imm16", "Register"],
-        category: 'native'
+        pseudo: false
     }],
     ["beq", {
         func: (instr: Instruction): void => {
@@ -393,7 +391,7 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
         },
         fields: ["rs", "rt", "imm"],
         types: ["Register", "Register", "Label"],
-        category: 'native'
+        pseudo: false
     }],
     ["bne", {
         func: (instr: Instruction): void => {
@@ -403,7 +401,7 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
         },
         fields: ["rs", "rt", "imm"],
         types: ["Register", "Register", "Label"],
-        category: 'native'
+        pseudo: false
     }],
     ["j", {
         func: (instr: Instruction): void => {
@@ -411,7 +409,7 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
         },
         fields: ["target"],
         types: ["Label"],
-        category: 'native'
+        pseudo: false
     }],
     ["jr", {
         func: (instr: Instruction): void => {
@@ -419,44 +417,44 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
         },
         fields: ["rs"],
         types: ["Register"],
-        category: 'native'
+        pseudo: false
     }],
     ["jal", {
         func: (instr: Instruction): void => {
-            registers[registerNames.indexOf("$ra")] = registers[registerNames.indexOf("$pc")] + 4;
+            registers[registerNames.indexOf("$ra")] = registers[registerNames.indexOf("$pc")];
             registers[registerNames.indexOf("$pc")] = instr.target;
         },
         fields: ["target"],
         types: ["Label"],
-        category: 'native'
+        pseudo: false
     }],
     // Pseudos
     ["bge", {
         func: (instr: Instruction): void => {},
         fields: ["rs", "rt", "imm"],
         types: ["Register", "Register", "Label"],
-        category: 'pseudo'
+        pseudo: true
     }],
     ["ble", {
         func: (instr: Instruction): void => {},
         fields: ["rs", "rt", "imm"],
         types: ["Register", "Register", "Label"],
-        category: 'pseudo'
+        pseudo: true
     }],
     // ["jalr", {
     //     func: (instr: Instruction): void => {
-    //         registers[registerNames.indexOf("$ra")] = registers[registerNames.indexOf("$pc")] + 4;
+    //         registers[registerNames.indexOf("$ra")] = registers[registerNames.indexOf("$pc")];
     //         registers[registerNames.indexOf("$pc")] = registers[instr.rs];
     //     },
     //     fields: ["rs"],
     //     types: ["Register"],
-    //     category: 'pseudo'
+    //     pseudo: true
     // }],
     ["li", {
         func: (instr: Instruction): void => {},
         fields: ["rt", "imm"],
         types: ["Register", "UImm32"],
-        category: 'pseudo'
+        pseudo: true
     }],
     // ["la", {
     //     func: (instr: Instruction): void => {
@@ -472,7 +470,7 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
     //     },
     //     fields: ["rd", "rs"],
     //     types: ["Register", "Register"],
-    //     category: 'pseudo'
+    //     pseudo: true
     // }],
     // ["mul", {
     //     func: (instr: Instruction): void => {
@@ -480,14 +478,14 @@ export const InstructionSpec: Map<string, InstructionSpecType> = new Map([
     //     },
     //     fields: ["rd", "rs", "rt"],
     //     types: ["Register", "Register", "Register"],
-    //     category: 'pseudo'
+    //     pseudo: true
     // }]
 ]);
 
 export const expandPseudoInstruction = (pseudoInstruction: Instruction): Instruction[] => {
     const spec = InstructionSpec.get(pseudoInstruction.name);
     if (!spec) throw new Error(`Pseudo expansion failed because pseudo-instruction ${pseudoInstruction.name} doesn't exist`);
-    if (spec.category !== "pseudo") throw new Error('Native instruction was passed to expandPseudoInstruction');
+    if (!spec.pseudo) throw new Error('Native instruction was passed to expandPseudoInstruction');
     const nativeInstructions: Instruction[] = [];
 
     switch (pseudoInstruction.name){

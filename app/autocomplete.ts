@@ -1,6 +1,6 @@
 import { registerNames } from "./interpreter";
 import { CompletionContext, Completion, CompletionResult } from "@codemirror/autocomplete";
-import { InstructionCategory, InstructionSpec, InstructionSpecType, Operand, OperandType,  } from "./instructions";
+import { InstructionSpec, InstructionSpecType, Operand, OperandType,  } from "./instructions";
 import { sourceToInstructions, minify } from "./interpreter";
 
 export default function autocompletions(context: CompletionContext): CompletionResult {
@@ -42,14 +42,14 @@ export default function autocompletions(context: CompletionContext): CompletionR
     const spec: InstructionSpecType = instr[1];
     const fields: Operand[] = spec.fields;
     const types: OperandType[] = spec.types;
-    const category: InstructionCategory = spec.category;
+    const pseudo = spec.pseudo
     const instrAutocomplete: Completion = {
       label: `${name}`,
       type: `function`,
       detail: `=> ${name}/${fields.length} [${fields.map((field: Operand, i: number) => {
         const argType = types[i];
         return `${field} (${argType})`;
-      }).join(", ")}] (${category.toUpperCase()})`,
+      }).join(", ")}] (${(pseudo) ? "PSEUDO" : "NATIVE"})`,
       apply: `${name} `
     }
     instrAutocompletes.push(instrAutocomplete);
