@@ -5,12 +5,13 @@ import { EditorView, keymap, lineNumbers, gutter } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap} from "@codemirror/commands";
 import { autocompletion } from "@codemirror/autocomplete";
 
-import { HighlightStyle, syntaxHighlighting } from "@codemirror/language"
-import { tags } from "@lezer/highlight"
+import { StreamLanguage, HighlightStyle, syntaxHighlighting } from "@codemirror/language";
+import { tags } from "@lezer/highlight";
 
 import { registers, registerNames, updateMemoryViewAddress, updateMemoryView, updateRegisterDisplay, runProgram, stepProgram, resetProgram} from './interpreter';
 import autocompletions from './autocomplete'; 
 import './globals.css'
+import { InstructionSpec } from './instructions';
 
 export let numberFormat: number = 10; // DEFAULT = Decimal
 
@@ -40,18 +41,31 @@ lw $s0, 0($sp)
 addi $sp, $sp, 4
 `;
 
-const myCustomHighlightStyle = HighlightStyle.define([
-  { tag: tags.keyword, color: "#ff79c6", fontWeight: "bold" },
-  { tag: tags.comment, color: "#6272a4", fontStyle: "italic" },
-  { tag: tags.string, color: "#f1fa8c" },
-  { tag: tags.number, color: "#bd93f9" },
-  { tag: tags.variableName, color: "#f8f8f2" },
-  { tag: tags.operator, color: "#ffb86c" }
-])
-export const customHighlightExtension = syntaxHighlighting(myCustomHighlightStyle);
-
 function Editor(){
   const editorRef = useRef<HTMLDivElement | null>(null);
+
+  const myCustomHighlightStyle = HighlightStyle.define([
+    { tag: tags.keyword, color: "#00AAAA", fontWeight: "bold" },
+    { tag: tags.comment, color: "#6272a4", fontStyle: "italic" },
+    { tag: tags.variableName, color: "#61afef" },
+    { tag: tags.labelName, color: "#0033B3" },
+    { tag: tags.number, color: "#1750EB" }
+  ]);
+  const MIPSHighlights = syntaxHighlighting(myCustomHighlightStyle)
+  const MIPSLang = StreamLanguage.define({
+    token(stream) {
+      if (stream.match(/#.*/)) return "comment"
+      if (stream.match(/[A-Za-z_][A-Za-z0-9_]*(?=\s*:)/)) return "labelName";
+      if (stream.match(/\$[A-Za-z_][A-Za-z0-9_]*/)) return "variableName";
+      for (const instrName of InstructionSpec.keys()){
+        if (stream.match(`${instrName} `)) return "keyword";
+      }
+      if (stream.match(/[0-9]+/)) return "number"
+      stream.next()
+      return null;
+    }
+  })
+
   useEffect(() => {
     if (!editorRef.current) throw new Error(`react error : editorRef undefined`);
     const editorCode = localStorage.getItem("storedCode") ?? defaultCode;
@@ -59,7 +73,8 @@ function Editor(){
       doc: editorCode,
       extensions: [
         autocompletion({ override: [autocompletions] }),
-        customHighlightExtension,
+        MIPSLang,
+        MIPSHighlights,
         history(),
         keymap.of(historyKeymap),
         keymap.of(defaultKeymap),
