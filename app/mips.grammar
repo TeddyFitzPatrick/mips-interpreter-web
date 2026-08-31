@@ -1,0 +1,17 @@
+@top Program { line* }
+
+line {
+  Instruction
+}
+
+Instruction {
+  "addi"
+}
+
+Label {
+
+}
+
+@tokens {
+    labelName { $[A-Za-z_.] $[A-Za-z0-9_.]* }
+}

@@ -418,11 +418,11 @@ export const validateLabelName = (label: string): boolean | string => {
   if (label === "") return `Empty label`;
   // No spaces in the label name
   if (/\s/.test(label)) return `Invalid label ${label}`;
-  // Only letters or _ for the first character
-  if (!/^[A-Za-z_]$/.test(label[0])) return `Illegal first character for label ${label}`;
-  // All subsequent characters in the label must be alphanumeric or _
+  // Only letters, _, or . for the first character
+  if (!/^[A-Za-z_.]$/.test(label[0])) return `Illegal first character for label ${label}`;
+  // All subsequent characters in the label must be alphanumeric, _, or .
   for (let index = 1; index < label.length; index++){
-    if (!/^[A-Za-z0-9_]$/.test(label[index])) return `Illegal label ${label}, special characters not allowed`;
+    if (!/^[A-Za-z0-9_.]$/.test(label[index])) return `Illegal label ${label}, special characters not allowed`;
   }
   // No duplicate labels
   if (label in symtab) return `Duplicate label ${label}`;
